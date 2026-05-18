@@ -12,9 +12,9 @@ clean:
 	find . -name '*.byte' -o -name '*.cmi' -o -name '*.cmo' -o -name '*.cma' | xargs rm -f
 
 hello: build
-	ocamlc -g -o test/_hello.byte test/smoke/hello.ml
-	dune exec -- compiler/bin-lua_of_ocaml/main.exe -- test/_hello.byte -o test/_hello.lua
-	lua test/_hello.lua
+	ocamlc -g -o _hello.byte hello.ml
+	dune exec -- compiler/bin-lua_of_ocaml/main.exe -- _hello.byte -o _hello.lua
+	lua _hello.lua
 
 run: build
 	dune exec -- compiler/bin-lua_of_ocaml/main.exe -- $(FILE)
