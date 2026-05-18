@@ -30,6 +30,7 @@ let var_name v =
 
 let ident_of_var v = L.S { name = var_name v; var = Some v }
 let evar v = L.EVar (ident_of_var v)
+let var_str v = var_name v
 let one = L.int_ 1
 let two = L.int_ 2
 let block_field e n = L.access e (L.int_ (n + 2))
@@ -60,7 +61,7 @@ let rec translate_constant = function
 
 (* ---- Expression translation ---- *)
 
-let rec translate_expr = function
+and translate_expr = function
   | Code.Apply { f; args; _ } ->
       L.call (evar f) (List.map args ~f:evar)
   | Code.Block (tag, fields, _, _) ->
@@ -99,21 +100,24 @@ and translate_prim p args =
 
 (* ---- Closure body: compile inner CFG as a while-switch trampoline ---- *)
 
+and bind_args tgt_params arg_vars =
+  if List.length tgt_params = List.length arg_vars
+  then List.map2 tgt_params arg_vars ~f:(fun p a -> L.Assign ([evar p], [evar a]))
+  else []
+
 and closure_body entry_pc =
   let visited = ref Code.Addr.Set.empty in
-  let blocks : (Code.Addr.t * Js_of_ocaml_compiler.Code.block) list ref = ref [] in
+  let blocks = ref [] in
   let rec collect pc =
     if not (Code.Addr.Set.mem pc !visited) then (
       visited := Code.Addr.Set.add pc !visited;
       let b = Code.Addr.Map.find pc !current_blocks in
       blocks := (pc, b) :: !blocks;
-      (* Follow closures within instructions *)
       List.iter b.body ~f:(fun instr ->
           match instr with
           | Code.Let (_, Code.Closure (_, (pc', _), _)) ->
               if Code.Addr.Map.mem pc' !current_blocks then collect pc'
           | _ -> ());
-      (* Follow control flow *)
       match b.branch with
       | Code.Branch (pc', _) -> collect pc'
       | Code.Cond (_, (pc1, _), (pc2, _)) -> collect pc1; collect pc2
@@ -123,12 +127,12 @@ and closure_body entry_pc =
   in
   collect entry_pc;
 
-  (* Helper accessors — need explicit type annotation for record field access *)
+  (* Helper to extract record fields *)
   let get_params (b : Js_of_ocaml_compiler.Code.block) = b.params in
   let get_body (b : Js_of_ocaml_compiler.Code.block) = b.body in
   let get_branch (b : Js_of_ocaml_compiler.Code.block) = b.branch in
 
-  (* Forward-declare all variables: block params + Let-bound vars *)
+  (* Forward-declare all variables *)
   let var_set = ref Code.Var.Set.empty in
   let var_decls = ref [] in
   let declare v =
@@ -145,13 +149,16 @@ and closure_body entry_pc =
           match instr with
           | Code.Let (x, _) -> declare x
           | _ -> ());
-      (* Also collect vars from branch instructions *)
       (match branch with
        | Code.Pushtrap (_, x, _) -> declare x
        | _ -> ()));
 
+  (* Runtime variables *)
   let pc_var = L.ident "_pc" in
-  let pc_init = L.Assign ([L.EVar pc_var], [L.int_ (entry_pc :> int)]) in
+  let exn_var = L.ident "_exn" in
+  let exn_sp_var = L.ident "_exn_sp" in
+
+  (* Build per-block switch cases *)
   let switch_cases = List.rev_map !blocks ~f:(fun (pc, b) ->
       let body = get_body b in
       let branch = get_branch b in
@@ -177,29 +184,42 @@ and closure_body entry_pc =
       in
       let term_stmts = match branch with
         | Code.Return x -> [L.Return [evar x]]
-        | Code.Raise (x, _) ->
-            [L.ExprStmt (L.call (L.EVar (L.ident "caml_raise")) [evar x]);
-             L.Assign ([L.EVar pc_var], [L.int_ (-1)])]
         | Code.Stop -> [L.Return []]
+
+        | Code.Raise (x, _) ->
+            (* Unwind exception stack, jump to handler *)
+            let f = L.ident "_f" in
+            [ L.If (L.bin L.Gt (L.EVar exn_sp_var) (L.int_ 0),
+                (* Pop frame: read at _exn_sp, then decrement *)
+                [ L.Assign ([L.EVar f], [L.access (L.EVar exn_var) (L.EVar exn_sp_var)])
+                ; L.Assign ([L.EVar exn_sp_var], [L.bin L.Sub (L.EVar exn_sp_var) one])
+                ; L.ExprStmt (L.call (L.EVar (L.ident "caml_set_global"))
+                               [L.access (L.EVar f) one; evar x])
+                ; L.ExprStmt (L.call (L.EVar (L.ident "caml_bind_frame"))
+                               [L.EVar f])
+                ; L.Assign ([L.EVar pc_var], [L.access (L.EVar f) two])
+                ],
+                [],
+                (* No handler *)
+                Some [ L.ExprStmt (L.call (L.EVar (L.ident "caml_raise")) [evar x])
+                     ; L.Assign ([L.EVar pc_var], [L.int_ (-1)])
+                     ])
+            ]
+
         | Code.Branch (pc', args) ->
             let tgt = get_params (Code.Addr.Map.find pc' !current_blocks) in
-            let assigns = List.map2 tgt args ~f:(fun p a ->
-                L.Assign ([evar p], [evar a]))
-            in
-            assigns @ [L.Assign ([L.EVar pc_var], [L.int_ (pc' :> int)])]
+            bind_args tgt args
+            @ [L.Assign ([L.EVar pc_var], [L.int_ (pc' :> int)])]
+
         | Code.Cond (x, (pc1, args1), (pc2, args2)) ->
             let tgt1 = get_params (Code.Addr.Map.find pc1 !current_blocks) in
             let tgt2 = get_params (Code.Addr.Map.find pc2 !current_blocks) in
-            let body1 = List.map2 tgt1 args1 ~f:(fun p a ->
-                L.Assign ([evar p], [evar a]))
-            in
-            let body2 = List.map2 tgt2 args2 ~f:(fun p a ->
-                L.Assign ([evar p], [evar a]))
-            in
-            [L.If (evar x,
-                   body1 @ [L.Assign ([L.EVar pc_var], [L.int_ (pc1 :> int)])],
-                   [],
-                   Some (body2 @ [L.Assign ([L.EVar pc_var], [L.int_ (pc2 :> int)])]))]
+            let body1 = bind_args tgt1 args1
+                        @ [L.Assign ([L.EVar pc_var], [L.int_ (pc1 :> int)])] in
+            let body2 = bind_args tgt2 args2
+                        @ [L.Assign ([L.EVar pc_var], [L.int_ (pc2 :> int)])] in
+            [L.If (evar x, body1, [], Some body2)]
+
         | Code.Switch (x, cases) ->
             let n = Array.length cases in
             let rec build_cases i =
@@ -207,32 +227,44 @@ and closure_body entry_pc =
               else
                 let (pc', args') = cases.(i) in
                 let tgt = get_params (Code.Addr.Map.find pc' !current_blocks) in
-                let body = List.map2 tgt args' ~f:(fun p a ->
-                    L.Assign ([evar p], [evar a]))
-                in
-                L.If (L.bin L.Eq (evar x) (L.int_ i),
-                      body @ [L.Assign ([L.EVar pc_var], [L.int_ (pc' :> int)])],
-                      [],
-                      None) :: build_cases (i + 1)
+                let body = bind_args tgt args'
+                           @ [L.Assign ([L.EVar pc_var], [L.int_ (pc' :> int)])] in
+                L.If (L.bin L.Eq (evar x) (L.int_ i), body, [], None)
+                :: build_cases (i + 1)
             in
             build_cases 0
-        | Code.Pushtrap ((_pc_h, _args_h), x, (pc_c, args_c)) ->
+
+        | Code.Pushtrap ((pc_h, args_h), x, (pc_c, args_c)) ->
+            (* Push handler frame: {x_name, handler_pc, param_names, arg_values}
+               x_name is the Lua variable name to store the caught exception into *)
+            let h_params = get_params (Code.Addr.Map.find pc_h !current_blocks) in
+            let frame = L.table
+                [ L.TArray (L.string_ (var_str x))
+                ; L.TArray (L.int_ (pc_h :> int))
+                ; L.TArray (L.table (List.map h_params
+                                        ~f:(fun p -> L.TArray (L.string_ (var_str p)))))
+                ; L.TArray (L.table (List.map args_h ~f:(fun v -> L.TArray (evar v))))
+                ]
+            in
+            let push_exn = L.Assign ([L.EVar exn_sp_var],
+                                      [L.bin L.Add (L.EVar exn_sp_var) one]) in
+            let store_frame = L.Assign
+                ([L.access (L.EVar exn_var) (L.EVar exn_sp_var)], [frame]) in
             let tgt_c = get_params (Code.Addr.Map.find pc_c !current_blocks) in
-            let assigns = (if List.length tgt_c = List.length args_c
-                then List.map2 tgt_c args_c ~f:(fun p a -> L.Assign ([evar p], [evar a]))
-                else [])
-            in
-            (* Set x to a valid table initially; continuation may update it *)
             L.Assign ([evar x], [make_block (L.int_ 0) []])
-            :: assigns
+            :: push_exn
+            :: store_frame
+            :: bind_args tgt_c args_c
             @ [L.Assign ([L.EVar pc_var], [L.int_ (pc_c :> int)])]
+
         | Code.Poptrap (pc_after, args) ->
-            (* Continue to the block after the protected region *)
+            (* Pop exception stack *)
+            let pop_exn = L.Assign ([L.EVar exn_sp_var],
+                                     [L.bin L.Sub (L.EVar exn_sp_var) one]) in
             let tgt = get_params (Code.Addr.Map.find pc_after !current_blocks) in
-            let assigns = List.map2 tgt args ~f:(fun p a ->
-                L.Assign ([evar p], [evar a]))
-            in
-            assigns @ [L.Assign ([L.EVar pc_var], [L.int_ (pc_after :> int)])]
+            pop_exn
+            :: bind_args tgt args
+            @ [L.Assign ([L.EVar pc_var], [L.int_ (pc_after :> int)])]
       in
       (pc_val, instr_stmts @ term_stmts))
   in
@@ -242,11 +274,20 @@ and closure_body entry_pc =
         [L.If (L.bin L.Eq (L.EVar pc_var) pc_val, stmts, [], None)])
   in
 
+  let f_tmp = L.ident "_f" in
+  let exn_init =
+    [ L.Assign ([L.EVar exn_var], [L.table []])
+    ; L.Assign ([L.EVar exn_sp_var], [L.int_ 0])
+    ; L.Assign ([L.EVar f_tmp], [L.nil])
+    ]
+  in
+  let pc_init = L.Assign ([L.EVar pc_var], [L.int_ (entry_pc :> int)]) in
   let exit_check = L.If (L.bin L.Eq (L.EVar pc_var) (L.int_ (-1)),
                           [L.Return [L.int_ 0]], [], None) in
   let while_loop = L.While (L.bool_ true,
     exit_check
     :: (List.rev !var_decls)
+    @ exn_init
     @ [pc_init]
     @ while_body)
   in

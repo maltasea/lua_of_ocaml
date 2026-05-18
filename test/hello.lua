@@ -365,8 +365,20 @@ function caml_call_gen(f, ...)
   end
 end
 
+---- Exception frame binding ----
+function caml_set_global(name, value)
+  _G[name] = value
+end
+
+function caml_bind_frame(f)
+  local param_names = f[3]
+  local arg_values = f[4]
+  for i = 1, #param_names do
+    _G[param_names[i]] = arg_values[i]
+  end
+end
+
 ---- Misc ----
--- caml_ml_output is a function, not a channel variable
 
 while true do if _pc == -1 then return 0
  end
@@ -1252,6 +1264,9 @@ _v1015 = nil
 _v1014 = nil
 _v1013 = nil
 _v1012 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 0
 if _pc == 0 then Out_of_memory_359 = {248, "Out_of_memory", -2}
 Sys_error_361 = {248, "Sys_error", -4}
@@ -1364,6 +1379,9 @@ _v6 = nil
 _v51 = nil
 _v3 = nil
 _v52 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 1
 if _pc == 1 then _v52 = type(_v2) == "number"
 if _v52 then _pc = 2
@@ -1539,6 +1557,9 @@ _v57 = nil
 _v58 = nil
 _v104 = nil
 _v105 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 20
 if _pc == 20 then _v105 = type(_v55) == "number"
 if _v105 then _pc = 21
@@ -1773,6 +1794,9 @@ _v110 = nil
 _v111 = nil
 _v216 = nil
 _v217 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 39
 if _pc == 39 then _v217 = type(_v108) == "number"
 if _v217 then _pc = 40
@@ -2113,6 +2137,9 @@ _v224 = nil
 _v335 = nil
 _v221 = nil
 _v336 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 68
 if _pc == 68 then _v336 = type(_v219) == "number"
 if _v336 then _pc = 69
@@ -3037,20 +3064,38 @@ _v344 = caml_register_named_value(_v343, _v342)
 _v345 = function(_v346) while true do if _pc == -1 then return 0
  end
 _v348 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 296
 if _pc == 296 then _v348 = {0, Failure_347, _v346}
-caml_raise(_v348)
+if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], _v348)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(_v348)
 _pc = -1
+ end
  end
  end
 end
 _v349 = function(_v350) while true do if _pc == -1 then return 0
  end
 _v351 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 295
 if _pc == 295 then _v351 = {0, Invalid_argument_341, _v350}
-caml_raise(_v351)
+if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], _v351)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(_v351)
 _pc = -1
+ end
  end
  end
 end
@@ -3060,6 +3105,9 @@ _v355 = {248, _v354, _v353}
 _v366 = function(_v368, _v367) while true do if _pc == -1 then return 0
  end
 _v369 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 292
 if _pc == 292 then _v369 = caml_lessequal(_v368, _v367)
 if _v369 then _pc = 293
@@ -3075,6 +3123,9 @@ end
 _v370 = function(_v372, _v371) while true do if _pc == -1 then return 0
  end
 _v373 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 289
 if _pc == 289 then _v373 = caml_greaterequal(_v372, _v371)
 if _v373 then _pc = 290
@@ -3091,6 +3142,9 @@ _v374 = function(_v375) while true do if _pc == -1 then return 0
  end
 _v377 = nil
 _v376 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 286
 if _pc == 286 then _v376 = 0 <= _v375
 if _v376 then _pc = 287
@@ -3108,6 +3162,9 @@ _v378 = function(_v379) while true do if _pc == -1 then return 0
  end
 _v380 = nil
 _v381 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 285
 if _pc == 285 then _v380 = -2
 _v381 = int_xor(_v379, _v380)
@@ -3138,6 +3195,9 @@ _v408 = nil
 _v409 = nil
 _v410 = nil
 _v411 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 284
 if _pc == 284 then _v402 = caml_ml_string_length(_v401)
 _v403 = caml_ml_string_length(_v400)
@@ -3160,6 +3220,9 @@ _v417 = nil
 _v419 = nil
 _v415 = nil
 _v414 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 280
 if _pc == 280 then _v414 = 0 <= _v413
 if _v414 then _pc = 281
@@ -3184,6 +3247,9 @@ if _pc == 283 then return _v413
 end
 _v420 = function(_v421) while true do if _pc == -1 then return 0
  end
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 277
 if _pc == 277 then if _v421 then _pc = 278
  else _pc = 279
@@ -3202,6 +3268,9 @@ _v432 = nil
 _v431 = nil
 _v429 = nil
 _v427 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 272
 if _pc == 272 then _v427 = caml_string_notequal(_v425, _v426)
 if _v427 then _pc = 273
@@ -3229,6 +3298,9 @@ _v434 = function(_v435) while true do if _pc == -1 then return 0
 _v440 = nil
 _v439 = nil
 _v437 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 267
 if _pc == 267 then _v437 = caml_string_notequal(_v435, _v436)
 if _v437 then _pc = 268
@@ -3252,6 +3324,9 @@ end
 _v443 = function(_v444) while true do if _pc == -1 then return 0
  end
 _v446 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 266
 if _pc == 266 then _v446 = caml_format_int(_v445, _v444)
 return _v446
@@ -3267,15 +3342,21 @@ _v454 = nil
 _v455 = nil
 _v449 = nil
 _v450 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 259
 if _pc == 259 then _v449 = _v448
 _pc = 260
  end
 if _pc == 260 then _v450 = {0}
+_exn_sp = _exn_sp + 1
+_exn[_exn_sp] = {"_v450", 261, {}, {}}
 _pc = 263
  end
 if _pc == 261 then _v454 = caml_int_of_string(_v448)
 _v455 = {0, _v454}
+_exn_sp = _exn_sp - 1
 _pc = 262
  end
 if _pc == 263 then _v451 = _v450[2]
@@ -3287,8 +3368,14 @@ if _v452 then _pc = 264
 if _pc == 264 then _v453 = 0
 return _v453
  end
-if _pc == 265 then caml_raise(_v450)
+if _pc == 265 then if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], _v450)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(_v450)
 _pc = -1
+ end
  end
  end
 end
@@ -3313,6 +3400,9 @@ _v458 = nil
 _v459 = nil
 _v477 = nil
 _v478 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 258
 if _pc == 258 then _v458 = caml_ml_string_length(_v457)
 _v459 = function(_v460) while true do if _pc == -1 then return 0
@@ -3332,6 +3422,9 @@ _v464 = nil
 _v465 = nil
 _v463 = nil
 _v461 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 249
 if _pc == 249 then _v461 = _v458 <= _v460
 if _v461 then _pc = 250
@@ -3439,6 +3532,9 @@ _v479 = function(_v480) while true do if _pc == -1 then return 0
  end
 _v482 = nil
 _v483 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 248
 if _pc == 248 then _v482 = caml_format_float(_v481, _v480)
 _v483 = _v456(_v482)
@@ -3455,15 +3551,21 @@ _v491 = nil
 _v492 = nil
 _v486 = nil
 _v487 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 241
 if _pc == 241 then _v486 = _v485
 _pc = 242
  end
 if _pc == 242 then _v487 = {0}
+_exn_sp = _exn_sp + 1
+_exn[_exn_sp] = {"_v487", 243, {}, {}}
 _pc = 245
  end
 if _pc == 243 then _v491 = caml_float_of_string(_v485)
 _v492 = {0, _v491}
+_exn_sp = _exn_sp - 1
 _pc = 244
  end
 if _pc == 245 then _v488 = _v487[2]
@@ -3475,8 +3577,14 @@ if _v489 then _pc = 246
 if _pc == 246 then _v490 = 0
 return _v490
  end
-if _pc == 247 then caml_raise(_v487)
+if _pc == 247 then if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], _v487)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(_v487)
 _pc = -1
+ end
  end
  end
 end
@@ -3497,6 +3605,9 @@ _v499 = nil
 _v500 = nil
 _v497 = nil
 _v498 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 98
 if _pc == 98 then if _v496 then _pc = 99
  else _pc = 104
@@ -3556,6 +3667,9 @@ _v518 = nil
 _v519 = nil
 _v516 = nil
 _v517 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 105
 if _pc == 105 then if _v513 then _pc = 106
  else _pc = 111
@@ -3613,6 +3727,9 @@ _v541 = function(_v544, _v543, _v542) while true do if _pc == -1 then return 0
 _v545 = nil
 _v546 = nil
 _v547 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 240
 if _pc == 240 then _v545 = caml_sys_open(_v542, _v544, _v543)
 _v546 = caml_ml_open_descriptor_out(_v545)
@@ -3625,6 +3742,9 @@ _v548 = function(_v549) while true do if _pc == -1 then return 0
  end
 _v550 = nil
 _v552 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 239
 if _pc == 239 then _v550 = 876
 _v552 = _v541(_v551, _v550, _v549)
@@ -3636,6 +3756,9 @@ _v553 = function(_v554) while true do if _pc == -1 then return 0
  end
 _v555 = nil
 _v557 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 238
 if _pc == 238 then _v555 = 876
 _v557 = _v541(_v556, _v555, _v554)
@@ -3666,6 +3789,9 @@ _v560 = nil
 _v579 = nil
 _v580 = nil
 _v581 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 237
 if _pc == 237 then _v560 = function(_v561) while true do if _pc == -1 then return 0
  end
@@ -3686,6 +3812,9 @@ _v567 = nil
 _v568 = nil
 _v562 = nil
 _v563 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 226
 if _pc == 226 then if _v561 then _pc = 227
  else _pc = 236
@@ -3700,9 +3829,12 @@ _v567 = _v563
 _pc = 228
  end
 if _pc == 228 then _v568 = {0}
+_exn_sp = _exn_sp + 1
+_exn[_exn_sp] = {"_v568", 229, {}, {}}
 _pc = 231
  end
 if _pc == 229 then _v577 = caml_ml_flush(_v563)
+_exn_sp = _exn_sp - 1
 _pc = 230
  end
 if _pc == 231 then _v569 = _v568[2]
@@ -3723,8 +3855,14 @@ _pc = 235
 if _pc == 235 then _v576 = _v560(_v573)
 return _v576
  end
-if _pc == 233 then caml_raise(_v568)
+if _pc == 233 then if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], _v568)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(_v568)
 _pc = -1
+ end
  end
 if _pc == 236 then _v578 = 0
 return _v578
@@ -3749,9 +3887,12 @@ _v567 = _v563
 _pc = 228
  end
 if _pc == 228 then _v568 = {0}
+_exn_sp = _exn_sp + 1
+_exn[_exn_sp] = {"_v568", 229, {}, {}}
 _pc = 231
  end
 if _pc == 229 then _v577 = caml_ml_flush(_v563)
+_exn_sp = _exn_sp - 1
 _pc = 230
  end
 if _pc == 231 then _v569 = _v568[2]
@@ -3772,8 +3913,14 @@ _pc = 235
 if _pc == 235 then _v576 = _v560(_v573)
 return _v576
  end
-if _pc == 233 then caml_raise(_v568)
+if _pc == 233 then if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], _v568)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(_v568)
 _pc = -1
+ end
  end
 if _pc == 236 then _v578 = 0
 return _v578
@@ -3785,6 +3932,9 @@ _v582 = function(_v584, _v583) while true do if _pc == -1 then return 0
 _v585 = nil
 _v586 = nil
 _v587 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 225
 if _pc == 225 then _v585 = caml_ml_bytes_length(_v583)
 _v586 = 0
@@ -3798,6 +3948,9 @@ _v588 = function(_v590, _v589) while true do if _pc == -1 then return 0
 _v591 = nil
 _v592 = nil
 _v593 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 224
 if _pc == 224 then _v591 = caml_ml_string_length(_v589)
 _v592 = 0
@@ -3820,6 +3973,9 @@ _v602 = nil
 _v603 = nil
 _v600 = nil
 _v599 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 219
 if _pc == 219 then _v599 = 0 <= _v596
 if _v599 then _pc = 220
@@ -3875,6 +4031,9 @@ _v620 = nil
 _v621 = nil
 _v618 = nil
 _v617 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 214
 if _pc == 214 then _v617 = 0 <= _v614
 if _v617 then _pc = 215
@@ -3920,6 +4079,9 @@ _v630 = function(_v632, _v631) while true do if _pc == -1 then return 0
  end
 _v633 = nil
 _v634 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 213
 if _pc == 213 then _v633 = 0
 _v634 = caml_output_value(_v632, _v631, _v633)
@@ -3931,6 +4093,9 @@ _v635 = function(_v636) while true do if _pc == -1 then return 0
  end
 _v637 = nil
 _v638 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 212
 if _pc == 212 then _v637 = caml_ml_flush(_v636)
 _v638 = caml_ml_close_channel(_v636)
@@ -3951,14 +4116,20 @@ _v643 = nil
 _v651 = nil
 _v641 = nil
 _v642 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 202
 if _pc == 202 then _v641 = _v640
 _pc = 203
  end
 if _pc == 203 then _v642 = {0}
+_exn_sp = _exn_sp + 1
+_exn[_exn_sp] = {"_v642", 204, {}, {}}
 _pc = 206
  end
 if _pc == 204 then _v651 = caml_ml_flush(_v640)
+_exn_sp = _exn_sp - 1
 _pc = 205
  end
 if _pc == 206 then _v643 = 0
@@ -3971,9 +4142,12 @@ _v647 = _v645
 _pc = 208
  end
 if _pc == 208 then _v648 = {0}
+_exn_sp = _exn_sp + 1
+_exn[_exn_sp] = {"_v648", 209, {}, {}}
 _pc = 211
  end
 if _pc == 209 then _v650 = caml_ml_close_channel(_v644)
+_exn_sp = _exn_sp - 1
 _pc = 210
  end
 if _pc == 211 then _v649 = 0
@@ -3986,6 +4160,9 @@ _v652 = function(_v655, _v654, _v653) while true do if _pc == -1 then return 0
 _v656 = nil
 _v657 = nil
 _v658 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 201
 if _pc == 201 then _v656 = caml_sys_open(_v653, _v655, _v654)
 _v657 = caml_ml_open_descriptor_in(_v656)
@@ -3998,6 +4175,9 @@ _v659 = function(_v660) while true do if _pc == -1 then return 0
  end
 _v661 = nil
 _v663 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 200
 if _pc == 200 then _v661 = 0
 _v663 = _v652(_v662, _v661, _v660)
@@ -4009,6 +4189,9 @@ _v664 = function(_v665) while true do if _pc == -1 then return 0
  end
 _v666 = nil
 _v668 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 199
 if _pc == 199 then _v666 = 0
 _v668 = _v652(_v667, _v666, _v665)
@@ -4030,6 +4213,9 @@ _v677 = nil
 _v678 = nil
 _v675 = nil
 _v674 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 194
 if _pc == 194 then _v674 = 0 <= _v671
 if _v674 then _pc = 195
@@ -4080,6 +4266,9 @@ _v697 = nil
 _v693 = nil
 _v694 = nil
 _v692 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 112
 if _pc == 112 then _v692 = 0 < _v688
 if _v692 then _pc = 114
@@ -4092,8 +4281,14 @@ if _v694 then _pc = 115
  else _pc = 116
  end
  end
-if _pc == 115 then caml_raise(End_of_file_362)
+if _pc == 115 then if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], End_of_file_362)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(End_of_file_362)
 _pc = -1
+ end
  end
 if _pc == 116 then _v695 = int_sub(_v688, _v693)
 _v696 = int_add(_v689, _v693)
@@ -4119,6 +4314,9 @@ _v707 = nil
 _v708 = nil
 _v705 = nil
 _v704 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 189
 if _pc == 189 then _v704 = 0 <= _v701
 if _v704 then _pc = 190
@@ -4166,6 +4364,9 @@ _v720 = nil
 _v721 = nil
 _v722 = nil
 _v723 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 188
 if _pc == 188 then _v720 = caml_create_bytes(_v718)
 _v721 = 0
@@ -4221,6 +4422,9 @@ _v771 = nil
 _v772 = nil
 _v773 = nil
 _v774 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 187
 if _pc == 187 then _v726 = function(_v729, _v728, _v727) while true do if _pc == -1 then return 0
  end
@@ -4232,6 +4436,9 @@ _v734 = nil
 _v735 = nil
 _v736 = nil
 _v737 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 175
 if _pc == 175 then if _v727 then _pc = 176
  else _pc = 177
@@ -4283,6 +4490,9 @@ _v743 = nil
 _v744 = nil
 _v741 = nil
 _v742 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 178
 if _pc == 178 then _v741 = caml_ml_input_scan_line(_v725)
 _v742 = 0 == _v741
@@ -4298,8 +4508,14 @@ if _pc == 180 then _v743 = caml_create_bytes(_v739)
 _v744 = _v726(_v743, _v739, _v740)
 return _v744
  end
-if _pc == 181 then caml_raise(End_of_file_362)
+if _pc == 181 then if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], End_of_file_362)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(End_of_file_362)
 _pc = -1
+ end
  end
 if _pc == 182 then _v745 = 0 < _v741
 if _v745 then _pc = 183
@@ -4379,8 +4595,14 @@ if _pc == 180 then _v743 = caml_create_bytes(_v739)
 _v744 = _v726(_v743, _v739, _v740)
 return _v744
  end
-if _pc == 181 then caml_raise(End_of_file_362)
+if _pc == 181 then if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], End_of_file_362)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(End_of_file_362)
 _pc = -1
+ end
  end
 if _pc == 182 then _v745 = 0 < _v741
 if _v745 then _pc = 183
@@ -4430,14 +4652,20 @@ _v779 = nil
 _v780 = nil
 _v777 = nil
 _v778 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 170
 if _pc == 170 then _v777 = _v776
 _pc = 171
  end
 if _pc == 171 then _v778 = {0}
+_exn_sp = _exn_sp + 1
+_exn[_exn_sp] = {"_v778", 172, {}, {}}
 _pc = 174
  end
 if _pc == 172 then _v780 = caml_ml_close_channel(_v776)
+_exn_sp = _exn_sp - 1
 _pc = 173
  end
 if _pc == 174 then _v779 = 0
@@ -4448,6 +4676,9 @@ end
 _v781 = function(_v782) while true do if _pc == -1 then return 0
  end
 _v783 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 169
 if _pc == 169 then _v783 = caml_ml_output_char(_v538, _v782)
 return _v783
@@ -4457,6 +4688,9 @@ end
 _v784 = function(_v785) while true do if _pc == -1 then return 0
  end
 _v786 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 168
 if _pc == 168 then _v786 = _v588(_v538, _v785)
 return _v786
@@ -4466,6 +4700,9 @@ end
 _v787 = function(_v788) while true do if _pc == -1 then return 0
  end
 _v789 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 167
 if _pc == 167 then _v789 = _v582(_v538, _v788)
 return _v789
@@ -4476,6 +4713,9 @@ _v790 = function(_v791) while true do if _pc == -1 then return 0
  end
 _v792 = nil
 _v793 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 166
 if _pc == 166 then _v792 = _v443(_v791)
 _v793 = _v588(_v538, _v792)
@@ -4487,6 +4727,9 @@ _v794 = function(_v795) while true do if _pc == -1 then return 0
  end
 _v796 = nil
 _v797 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 165
 if _pc == 165 then _v796 = _v479(_v795)
 _v797 = _v588(_v538, _v796)
@@ -4500,6 +4743,9 @@ _v800 = nil
 _v801 = nil
 _v802 = nil
 _v803 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 164
 if _pc == 164 then _v800 = _v588(_v538, _v799)
 _v801 = 20
@@ -4514,6 +4760,9 @@ _v804 = function(_v805) while true do if _pc == -1 then return 0
 _v806 = nil
 _v807 = nil
 _v808 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 163
 if _pc == 163 then _v806 = 20
 _v807 = caml_ml_output_char(_v538, _v806)
@@ -4525,6 +4774,9 @@ end
 _v809 = function(_v810) while true do if _pc == -1 then return 0
  end
 _v811 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 162
 if _pc == 162 then _v811 = caml_ml_output_char(_v540, _v810)
 return _v811
@@ -4534,6 +4786,9 @@ end
 _v812 = function(_v813) while true do if _pc == -1 then return 0
  end
 _v814 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 161
 if _pc == 161 then _v814 = _v588(_v540, _v813)
 return _v814
@@ -4543,6 +4798,9 @@ end
 _v815 = function(_v816) while true do if _pc == -1 then return 0
  end
 _v817 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 160
 if _pc == 160 then _v817 = _v582(_v540, _v816)
 return _v817
@@ -4553,6 +4811,9 @@ _v818 = function(_v819) while true do if _pc == -1 then return 0
  end
 _v820 = nil
 _v821 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 159
 if _pc == 159 then _v820 = _v443(_v819)
 _v821 = _v588(_v540, _v820)
@@ -4564,6 +4825,9 @@ _v822 = function(_v823) while true do if _pc == -1 then return 0
  end
 _v824 = nil
 _v825 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 158
 if _pc == 158 then _v824 = _v479(_v823)
 _v825 = _v588(_v540, _v824)
@@ -4577,6 +4841,9 @@ _v828 = nil
 _v829 = nil
 _v830 = nil
 _v831 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 157
 if _pc == 157 then _v828 = _v588(_v540, _v827)
 _v829 = 20
@@ -4591,6 +4858,9 @@ _v832 = function(_v833) while true do if _pc == -1 then return 0
 _v834 = nil
 _v835 = nil
 _v836 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 156
 if _pc == 156 then _v834 = 20
 _v835 = caml_ml_output_char(_v540, _v834)
@@ -4603,6 +4873,9 @@ _v837 = function(_v838) while true do if _pc == -1 then return 0
  end
 _v839 = nil
 _v840 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 155
 if _pc == 155 then _v839 = caml_ml_flush(_v538)
 _v840 = _v724(_v536)
@@ -4615,6 +4888,9 @@ _v841 = function(_v842) while true do if _pc == -1 then return 0
 _v843 = nil
 _v844 = nil
 _v845 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 154
 if _pc == 154 then _v843 = 0
 _v844 = _v837(_v843)
@@ -4628,6 +4904,9 @@ _v846 = function(_v847) while true do if _pc == -1 then return 0
 _v848 = nil
 _v849 = nil
 _v850 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 153
 if _pc == 153 then _v848 = 0
 _v849 = _v837(_v848)
@@ -4641,6 +4920,9 @@ _v851 = function(_v852) while true do if _pc == -1 then return 0
 _v853 = nil
 _v854 = nil
 _v855 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 152
 if _pc == 152 then _v853 = 0
 _v854 = _v837(_v853)
@@ -4654,6 +4936,9 @@ _v856 = function(_v857) while true do if _pc == -1 then return 0
 _v858 = nil
 _v859 = nil
 _v860 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 151
 if _pc == 151 then _v858 = 0
 _v859 = _v837(_v858)
@@ -4666,6 +4951,9 @@ _v861 = {0}
 _v862 = function(_v863) while true do if _pc == -1 then return 0
  end
 _v864 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 150
 if _pc == 150 then _v864 = _v863[3]
 return _v864
@@ -4683,6 +4971,9 @@ _v874 = nil
 _v875 = nil
 _v876 = nil
 _v877 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 149
 if _pc == 149 then _v868 = _v866[3]
 _v869 = _v866[2]
@@ -4719,6 +5010,9 @@ _v885 = nil
 _v897 = nil
 _v898 = nil
 _v899 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 120
 if _pc == 120 then _v881 = 2
 _v882 = {0, _v881}
@@ -4736,6 +5030,9 @@ _v887 = nil
 _v888 = nil
 _v889 = nil
 _v890 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 117
 if _pc == 117 then _v887 = 0
 _v888 = 2
@@ -4796,6 +5093,9 @@ end
 _v901 = function(_v902) while true do if _pc == -1 then return 0
  end
 _v903 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 148
 if _pc == 148 then _v903 = 0
 return _v903
@@ -4812,6 +5112,9 @@ _v910 = nil
 _v911 = nil
 _v912 = nil
 _v913 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 147
 if _pc == 147 then _v907 = 0
 _v908 = _v904[2]
@@ -4829,6 +5132,9 @@ _v914 = function(_v915) while true do if _pc == -1 then return 0
 _v916 = nil
 _v917 = nil
 _v918 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 146
 if _pc == 146 then _v916 = 0
 _v917 = _v905(_v916)
@@ -4841,6 +5147,9 @@ _v920 = caml_register_named_value(_v919, _v905)
 _v921 = function(_v922) while true do if _pc == -1 then return 0
  end
 _v923 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 145
 if _pc == 145 then _v923 = caml_ml_channel_size_64(_v922)
 return _v923
@@ -4850,6 +5159,9 @@ end
 _v924 = function(_v925) while true do if _pc == -1 then return 0
  end
 _v926 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 144
 if _pc == 144 then _v926 = caml_ml_pos_in_64(_v925)
 return _v926
@@ -4859,6 +5171,9 @@ end
 _v927 = function(_v929, _v928) while true do if _pc == -1 then return 0
  end
 _v930 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 143
 if _pc == 143 then _v930 = caml_ml_seek_in_64(_v929, _v928)
 return _v930
@@ -4868,6 +5183,9 @@ end
 _v931 = function(_v932) while true do if _pc == -1 then return 0
  end
 _v933 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 142
 if _pc == 142 then _v933 = caml_ml_channel_size_64(_v932)
 return _v933
@@ -4877,6 +5195,9 @@ end
 _v934 = function(_v935) while true do if _pc == -1 then return 0
  end
 _v936 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 141
 if _pc == 141 then _v936 = caml_ml_pos_out_64(_v935)
 return _v936
@@ -4886,6 +5207,9 @@ end
 _v937 = function(_v939, _v938) while true do if _pc == -1 then return 0
  end
 _v940 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 140
 if _pc == 140 then _v940 = caml_ml_seek_out_64(_v939, _v938)
 return _v940
@@ -4896,6 +5220,9 @@ _v941 = {0, _v937, _v934, _v931, _v927, _v924, _v921}
 _v942 = function(_v944, _v943) while true do if _pc == -1 then return 0
  end
 _v945 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 139
 if _pc == 139 then _v945 = caml_ml_set_binary_mode(_v944, _v943)
 return _v945
@@ -4905,6 +5232,9 @@ end
 _v946 = function(_v947) while true do if _pc == -1 then return 0
  end
 _v948 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 138
 if _pc == 138 then _v948 = caml_ml_close_channel(_v947)
 return _v948
@@ -4914,6 +5244,9 @@ end
 _v949 = function(_v950) while true do if _pc == -1 then return 0
  end
 _v951 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 137
 if _pc == 137 then _v951 = caml_ml_channel_size(_v950)
 return _v951
@@ -4923,6 +5256,9 @@ end
 _v952 = function(_v953) while true do if _pc == -1 then return 0
  end
 _v954 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 136
 if _pc == 136 then _v954 = caml_ml_pos_in(_v953)
 return _v954
@@ -4932,6 +5268,9 @@ end
 _v955 = function(_v957, _v956) while true do if _pc == -1 then return 0
  end
 _v958 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 135
 if _pc == 135 then _v958 = caml_ml_seek_in(_v957, _v956)
 return _v958
@@ -4941,6 +5280,9 @@ end
 _v959 = function(_v960) while true do if _pc == -1 then return 0
  end
 _v961 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 134
 if _pc == 134 then _v961 = caml_input_value(_v960)
 return _v961
@@ -4950,6 +5292,9 @@ end
 _v962 = function(_v963) while true do if _pc == -1 then return 0
  end
 _v964 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 133
 if _pc == 133 then _v964 = caml_ml_input_int(_v963)
 return _v964
@@ -4959,6 +5304,9 @@ end
 _v965 = function(_v966) while true do if _pc == -1 then return 0
  end
 _v967 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 132
 if _pc == 132 then _v967 = caml_ml_input_char(_v966)
 return _v967
@@ -4968,6 +5316,9 @@ end
 _v968 = function(_v969) while true do if _pc == -1 then return 0
  end
 _v970 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 131
 if _pc == 131 then _v970 = caml_ml_input_char(_v969)
 return _v970
@@ -4977,6 +5328,9 @@ end
 _v971 = function(_v973, _v972) while true do if _pc == -1 then return 0
  end
 _v974 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 130
 if _pc == 130 then _v974 = caml_ml_set_binary_mode(_v973, _v972)
 return _v974
@@ -4986,6 +5340,9 @@ end
 _v975 = function(_v976) while true do if _pc == -1 then return 0
  end
 _v977 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 129
 if _pc == 129 then _v977 = caml_ml_channel_size(_v976)
 return _v977
@@ -4995,6 +5352,9 @@ end
 _v978 = function(_v979) while true do if _pc == -1 then return 0
  end
 _v980 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 128
 if _pc == 128 then _v980 = caml_ml_pos_out(_v979)
 return _v980
@@ -5004,6 +5364,9 @@ end
 _v981 = function(_v983, _v982) while true do if _pc == -1 then return 0
  end
 _v984 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 127
 if _pc == 127 then _v984 = caml_ml_seek_out(_v983, _v982)
 return _v984
@@ -5013,6 +5376,9 @@ end
 _v985 = function(_v987, _v986) while true do if _pc == -1 then return 0
  end
 _v988 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 126
 if _pc == 126 then _v988 = caml_ml_output_int(_v987, _v986)
 return _v988
@@ -5022,6 +5388,9 @@ end
 _v989 = function(_v991, _v990) while true do if _pc == -1 then return 0
  end
 _v992 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 125
 if _pc == 125 then _v992 = caml_ml_output_char(_v991, _v990)
 return _v992
@@ -5031,6 +5400,9 @@ end
 _v993 = function(_v995, _v994) while true do if _pc == -1 then return 0
  end
 _v996 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 124
 if _pc == 124 then _v996 = caml_ml_output_char(_v995, _v994)
 return _v996
@@ -5040,6 +5412,9 @@ end
 _v997 = function(_v998) while true do if _pc == -1 then return 0
  end
 _v999 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 123
 if _pc == 123 then _v999 = caml_ml_flush(_v998)
 return _v999
@@ -5060,12 +5435,24 @@ _v1011 = 0
 return
  end
 if _pc == 296 then _v348 = {0, Failure_347, _v346}
-caml_raise(_v348)
+if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], _v348)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(_v348)
 _pc = -1
  end
+ end
 if _pc == 295 then _v351 = {0, Invalid_argument_341, _v350}
-caml_raise(_v351)
+if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], _v351)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(_v351)
 _pc = -1
+ end
  end
 if _pc == 292 then _v369 = caml_lessequal(_v368, _v367)
 if _v369 then _pc = 293
@@ -5181,10 +5568,13 @@ if _pc == 259 then _v449 = _v448
 _pc = 260
  end
 if _pc == 260 then _v450 = {0}
+_exn_sp = _exn_sp + 1
+_exn[_exn_sp] = {"_v450", 261, {}, {}}
 _pc = 263
  end
 if _pc == 261 then _v454 = caml_int_of_string(_v448)
 _v455 = {0, _v454}
+_exn_sp = _exn_sp - 1
 _pc = 262
  end
 if _pc == 263 then _v451 = _v450[2]
@@ -5196,8 +5586,14 @@ if _v452 then _pc = 264
 if _pc == 264 then _v453 = 0
 return _v453
  end
-if _pc == 265 then caml_raise(_v450)
+if _pc == 265 then if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], _v450)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(_v450)
 _pc = -1
+ end
  end
 if _pc == 258 then _v458 = caml_ml_string_length(_v457)
 _v459 = function(_v460) while true do if _pc == -1 then return 0
@@ -5217,6 +5613,9 @@ _v464 = nil
 _v465 = nil
 _v463 = nil
 _v461 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 249
 if _pc == 249 then _v461 = _v458 <= _v460
 if _v461 then _pc = 250
@@ -5326,10 +5725,13 @@ if _pc == 241 then _v486 = _v485
 _pc = 242
  end
 if _pc == 242 then _v487 = {0}
+_exn_sp = _exn_sp + 1
+_exn[_exn_sp] = {"_v487", 243, {}, {}}
 _pc = 245
  end
 if _pc == 243 then _v491 = caml_float_of_string(_v485)
 _v492 = {0, _v491}
+_exn_sp = _exn_sp - 1
 _pc = 244
  end
 if _pc == 245 then _v488 = _v487[2]
@@ -5341,8 +5743,14 @@ if _v489 then _pc = 246
 if _pc == 246 then _v490 = 0
 return _v490
  end
-if _pc == 247 then caml_raise(_v487)
+if _pc == 247 then if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], _v487)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(_v487)
 _pc = -1
+ end
  end
 if _pc == 98 then if _v496 then _pc = 99
  else _pc = 104
@@ -5454,6 +5862,9 @@ _v567 = nil
 _v568 = nil
 _v562 = nil
 _v563 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 226
 if _pc == 226 then if _v561 then _pc = 227
  else _pc = 236
@@ -5468,9 +5879,12 @@ _v567 = _v563
 _pc = 228
  end
 if _pc == 228 then _v568 = {0}
+_exn_sp = _exn_sp + 1
+_exn[_exn_sp] = {"_v568", 229, {}, {}}
 _pc = 231
  end
 if _pc == 229 then _v577 = caml_ml_flush(_v563)
+_exn_sp = _exn_sp - 1
 _pc = 230
  end
 if _pc == 231 then _v569 = _v568[2]
@@ -5491,8 +5905,14 @@ _pc = 235
 if _pc == 235 then _v576 = _v560(_v573)
 return _v576
  end
-if _pc == 233 then caml_raise(_v568)
+if _pc == 233 then if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], _v568)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(_v568)
 _pc = -1
+ end
  end
 if _pc == 236 then _v578 = 0
 return _v578
@@ -5517,9 +5937,12 @@ _v567 = _v563
 _pc = 228
  end
 if _pc == 228 then _v568 = {0}
+_exn_sp = _exn_sp + 1
+_exn[_exn_sp] = {"_v568", 229, {}, {}}
 _pc = 231
  end
 if _pc == 229 then _v577 = caml_ml_flush(_v563)
+_exn_sp = _exn_sp - 1
 _pc = 230
  end
 if _pc == 231 then _v569 = _v568[2]
@@ -5540,8 +5963,14 @@ _pc = 235
 if _pc == 235 then _v576 = _v560(_v573)
 return _v576
  end
-if _pc == 233 then caml_raise(_v568)
+if _pc == 233 then if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], _v568)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(_v568)
 _pc = -1
+ end
  end
 if _pc == 236 then _v578 = 0
 return _v578
@@ -5644,9 +6073,12 @@ if _pc == 202 then _v641 = _v640
 _pc = 203
  end
 if _pc == 203 then _v642 = {0}
+_exn_sp = _exn_sp + 1
+_exn[_exn_sp] = {"_v642", 204, {}, {}}
 _pc = 206
  end
 if _pc == 204 then _v651 = caml_ml_flush(_v640)
+_exn_sp = _exn_sp - 1
 _pc = 205
  end
 if _pc == 206 then _v643 = 0
@@ -5659,9 +6091,12 @@ _v647 = _v645
 _pc = 208
  end
 if _pc == 208 then _v648 = {0}
+_exn_sp = _exn_sp + 1
+_exn[_exn_sp] = {"_v648", 209, {}, {}}
 _pc = 211
  end
 if _pc == 209 then _v650 = caml_ml_close_channel(_v644)
+_exn_sp = _exn_sp - 1
 _pc = 210
  end
 if _pc == 211 then _v649 = 0
@@ -5729,8 +6164,14 @@ if _v694 then _pc = 115
  else _pc = 116
  end
  end
-if _pc == 115 then caml_raise(End_of_file_362)
+if _pc == 115 then if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], End_of_file_362)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(End_of_file_362)
 _pc = -1
+ end
  end
 if _pc == 116 then _v695 = int_sub(_v688, _v693)
 _v696 = int_add(_v689, _v693)
@@ -5794,6 +6235,9 @@ _v734 = nil
 _v735 = nil
 _v736 = nil
 _v737 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 175
 if _pc == 175 then if _v727 then _pc = 176
  else _pc = 177
@@ -5845,6 +6289,9 @@ _v743 = nil
 _v744 = nil
 _v741 = nil
 _v742 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 178
 if _pc == 178 then _v741 = caml_ml_input_scan_line(_v725)
 _v742 = 0 == _v741
@@ -5860,8 +6307,14 @@ if _pc == 180 then _v743 = caml_create_bytes(_v739)
 _v744 = _v726(_v743, _v739, _v740)
 return _v744
  end
-if _pc == 181 then caml_raise(End_of_file_362)
+if _pc == 181 then if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], End_of_file_362)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(End_of_file_362)
 _pc = -1
+ end
  end
 if _pc == 182 then _v745 = 0 < _v741
 if _v745 then _pc = 183
@@ -5941,8 +6394,14 @@ if _pc == 180 then _v743 = caml_create_bytes(_v739)
 _v744 = _v726(_v743, _v739, _v740)
 return _v744
  end
-if _pc == 181 then caml_raise(End_of_file_362)
+if _pc == 181 then if _exn_sp > 0 then _f = _exn[_exn_sp]
+_exn_sp = _exn_sp - 1
+caml_set_global(_f[1], End_of_file_362)
+caml_bind_frame(_f)
+_pc = _f[2]
+ else caml_raise(End_of_file_362)
 _pc = -1
+ end
  end
 if _pc == 182 then _v745 = 0 < _v741
 if _v745 then _pc = 183
@@ -5988,9 +6447,12 @@ if _pc == 170 then _v777 = _v776
 _pc = 171
  end
 if _pc == 171 then _v778 = {0}
+_exn_sp = _exn_sp + 1
+_exn[_exn_sp] = {"_v778", 172, {}, {}}
 _pc = 174
  end
 if _pc == 172 then _v780 = caml_ml_close_channel(_v776)
+_exn_sp = _exn_sp - 1
 _pc = 173
  end
 if _pc == 174 then _v779 = 0
@@ -6106,6 +6568,9 @@ _v887 = nil
 _v888 = nil
 _v889 = nil
 _v890 = nil
+_exn = {}
+_exn_sp = 0
+_f = nil
 _pc = 117
 if _pc == 117 then _v887 = 0
 _v888 = 2

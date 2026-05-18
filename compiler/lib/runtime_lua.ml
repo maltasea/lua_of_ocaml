@@ -367,8 +367,20 @@ function caml_call_gen(f, ...)
   end
 end
 
+---- Exception frame binding ----
+function caml_set_global(name, value)
+  _G[name] = value
+end
+
+function caml_bind_frame(f)
+  local param_names = f[3]
+  local arg_values = f[4]
+  for i = 1, #param_names do
+    _G[param_names[i]] = arg_values[i]
+  end
+end
+
 ---- Misc ----
--- caml_ml_output is a function, not a channel variable
 |}
 
 let postamble = {|
