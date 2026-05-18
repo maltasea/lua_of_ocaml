@@ -1,58 +1,72 @@
-lua_of_ocaml — OCaml to Lua Compiler
-====================================
+lua_of_ocaml — OCaml to Lua 5.1 Compiler
+==========================================
 
-Compiles OCaml programs to Lua 5.1, inspired by js_of_ocaml.
+Compiles OCaml bytecode programs to Lua 5.1, inspired by js_of_ocaml.
 
-Prerequisites
--------------
-- OCaml 4.13+ (tested with 5.4.0)
-- Dune 3.20+
-- Lua 5.1 at /usr/local/bin/lua
-- js_of_ocaml-compiler installed via opam
+First steps
+-----------
 
-  opam install js_of_ocaml-compiler
+### 1. Install
 
-Build
------
-  dune build
+You need OCaml, dune, Lua 5.1, and the js_of_ocaml compiler library:
 
-This produces the compiler at:
-  _build/default/compiler/bin-lua_of_ocaml/main.exe
+    opam install js_of_ocaml-compiler
 
-Usage
------
-Write an OCaml program:
+Clone and build:
 
-  (* hello.ml *)
-  let () = print_endline "hello from lua"
+    git clone git@github.com:maltasea/lua_of_ocaml.git
+    cd lua_of_ocaml
+    dune build
 
-Compile it to OCaml bytecode:
+The compiler is at `_build/default/compiler/bin-lua_of_ocaml/main.exe`.
 
-  ocamlc -o hello.byte hello.ml
+### 2. Write an OCaml program
 
-Run lua_of_ocaml:
+    (* hello.ml *)
+    let () = print_endline "hello from lua"
 
-  dune exec -- compiler/bin-lua_of_ocaml/main.exe -- hello.byte -o hello.lua
+### 3. Compile to bytecode
 
-Run the generated Lua:
+    ocamlc -o hello.byte hello.ml
 
-  /usr/local/bin/lua hello.lua
+### 4. Run lua_of_ocaml
+
+    dune exec -- compiler/bin-lua_of_ocaml/main.exe -- hello.byte -o hello.lua
+
+### 5. Run with Lua
+
+    lua hello.lua
+
+    hello from lua
 
 Architecture
 ------------
-OCaml source → ocamlc → bytecode → [jsoo parser] → IR → [lua_of_ocaml] → .lua
 
-lua_of_ocaml reuses js_of_ocaml's bytecode parser and optimizer (the IR is
-target-agnostic), and provides a new Lua code generator and runtime.
+    OCaml source
+      ocamlc
+        bytecode (.byte)
+          js_of_ocaml parser  (reused)
+            IR (Code.program)
+              lua_of_ocaml code generator  (generate_lua.ml)
+                Lua AST
+                  lua_output.ml
+                    .lua text
+                      + runtime_lua.ml  (embedded Lua primitives)
+                        lua hello.lua
+
+The IR (Code.program) from js_of_ocaml is target-agnostic. lua_of_ocaml
+reuses the bytecode parser and optimizations, and provides a structural
+CFG code generator modeled on js_of_ocaml's generate.ml.
 
 Files
 -----
-compiler/lib/lua.ml          Lua 5.1 AST
-compiler/lib/lua.mli         Lua 5.1 AST (interface)
-compiler/lib/lua_output.ml   Lua pretty printer (AST → text)
-compiler/lib/generate_lua.ml Code generator (jsoo IR → Lua AST)
-compiler/lib/runtime_lua.ml  OCaml runtime in Lua (embedded primitives)
-compiler/bin-lua_of_ocaml/   CLI entry point
+
+    compiler/lib/lua.ml            Lua 5.1 AST
+    compiler/lib/lua_output.ml     Lua pretty printer
+    compiler/lib/generate_lua.ml   Code generator (IR -> Lua)
+    compiler/lib/runtime_lua.ml    OCaml runtime in Lua (embedded)
+    compiler/bin-lua_of_ocaml/     CLI entry point
+    test/hello.ml                  Example OCaml program
 
 License
 -------
