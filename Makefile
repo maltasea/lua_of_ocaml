@@ -9,10 +9,13 @@ test:
 clean:
 	dune clean
 	rm -rf test/_out
-	rm -f hello.lua
+	rm -f hello*
 	find . -name '*.byte' -o -name '*.cmi' -o -name '*.cmo' -o -name '*.cma' | xargs rm -f
 
-hello: build
+hello.ml:
+	@echo "let () = print_endline \"hello from lua\"" > hello.ml
+
+hello: build hello.ml
 	ocamlc -g -o hello.byte hello.ml
 	dune exec -- compiler/bin-lua_of_ocaml/main.exe -- hello.byte -o hello.lua
 	@rm -f hello.byte hello.cmi hello.cmo
