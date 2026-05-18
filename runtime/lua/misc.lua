@@ -46,6 +46,18 @@ int_mul = caml_mul
 int_div = caml_div
 int_mod = caml_mod
 
+-- FFI demo: user-defined Lua function callable from OCaml via Extern
+function lu_add(a, b)
+  -- a,b are tagged OCaml ints (value * 2)
+  return a + b  -- tagged addition stays tagged
+end
+
+function lu_greet(name)
+  -- name is an OCaml string (= Lua string)
+  io.write("hello from Lua: " .. name .. "\n")
+  return name
+end
+
 function caml_atomic_load_field(obj, field_idx)
   local pos = math_floor(field_idx / 2) + 2
   return obj[pos] or 0
