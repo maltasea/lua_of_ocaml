@@ -1,10 +1,10 @@
+-- source: test/hello.byte
+-- lua_of_ocaml runtime: standard library (globals, call support)
+-- Provides: caml_register_global caml_register_named_value caml_get_global
+--           caml_fresh_oo_id caml_call_gen caml_set_global caml_bind_frame
 
--- lua_of_ocaml runtime (Lua 5.1)
 local math_floor = math.floor
-local math_ceil = math.ceil
-local math_abs = math.abs
 
--- Global data table for OCaml compilation units
 caml_global_data = {}
 
 function caml_register_global(id, name, v)
@@ -21,17 +21,58 @@ function caml_get_global(id)
   return caml_global_data[id + 1]
 end
 
--- OO support (stub)
 caml_oo_last_id = 0
 function caml_fresh_oo_id(_)
   caml_oo_last_id = caml_oo_last_id + 1
   return caml_oo_last_id * 2
 end
 
----- Integer arithmetic (tagged: ocaml_int * 2) ----
--- For add/sub: both operands already shifted, result remains shifted
--- For mul: (2a * 2b) / 2 = 2ab  (overflows easily in float, but OK for small ints)
--- For div: (2a/2) / (2b/2) * 2 = 2*(a/b)
+function caml_set_global(name, value)
+  _G[name] = value
+end
+
+function caml_bind_frame(f)
+  local param_names = f[3]
+  local arg_values = f[4]
+  for i = 1, #param_names do
+    _G[param_names[i]] = arg_values[i]
+  end
+end
+
+function caml_call_gen(f, ...)
+  local arity = f.arity or 0
+  local nargs = select("#", ...)
+  if arity == nargs then
+    return f(...)
+  elseif arity < nargs then
+    local args = { ... }
+    local r = f(unpack(args, 1, arity))
+    for i = arity + 1, nargs do r = r(args[i]) end
+    return r
+  else
+    local args = { ... }
+    return function(...)
+      local all = {}
+      for i = 1, nargs do all[i] = args[i] end
+      for i = 1, select("#", ...) do all[nargs + i] = select(i, ...) end
+      if #all >= arity then
+        return caml_call_gen(f, unpack(all, 1, arity))
+      else
+        return caml_call_gen(f, unpack(all))
+      end
+    end
+  end
+end
+
+-- lua_of_ocaml runtime: integer arithmetic and bitwise operations
+-- Provides: caml_mul caml_div caml_mod
+--           int_and int_or int_xor int_lsl int_lsr int_asr int_add int_sub int_neg
+--           caml_and caml_or caml_xor caml_lsl caml_lsr caml_asr
+--           caml_eq caml_neq caml_lt caml_le caml_gt caml_ge
+--           caml_lessequal caml_greaterequal caml_lessthan caml_greaterthan
+--           caml_not caml_is_int
+
+local math_floor = math.floor
 
 function caml_mul(a, b) return math_floor(a * b / 2) end
 function caml_div(a, b) return math_floor(math_floor(a / 2) / math_floor(b / 2)) * 2 end
@@ -42,7 +83,7 @@ function caml_mod(a, b)
   if m < 0 then m = m + b2 end return m * 2
 end
 
--- Helper: pure-Lua bitwise AND for 32-bit integers (Lua 5.1 compat)
+-- Pure-Lua bitwise for Lua 5.1
 local function uint_and(a, b)
   local r = 0; local w = 1
   for i = 0, 31 do
@@ -76,7 +117,6 @@ local function uint_shr(a, b)
   return math_floor(a / (2 ^ b))
 end
 
--- Bitwise ops on tagged ints (untag, operate, retag)
 function int_and(a, b) return uint_and(math_floor(a/2), math_floor(b/2)) * 2 end
 function int_or(a, b)  return uint_or(math_floor(a/2), math_floor(b/2)) * 2 end
 function int_xor(a, b) return uint_xor(math_floor(a/2), math_floor(b/2)) * 2 end
@@ -84,18 +124,16 @@ function int_lsl(a, b) return uint_shl(math_floor(a/2), math_floor(b/2)) * 2 end
 function int_lsr(a, b) return uint_shr(math_floor(a/2), math_floor(b/2)) * 2 end
 function int_asr(a, b)
   local a2 = math_floor(a / 2); local b2 = math_floor(b / 2)
-  if a2 >= 2^31 then a2 = a2 - 2^32 end  -- sign extend
+  if a2 >= 2^31 then a2 = a2 - 2^32 end
   return math_floor(a2 / (2 ^ b2)) * 2
 end
 function int_add(a, b) return a + b end
 function int_sub(a, b) return a - b end
 function int_neg(a) return -a end
 
--- Aliases
 caml_and = int_and; caml_or = int_or; caml_xor = int_xor
 caml_lsl = int_lsl; caml_lsr = int_lsr; caml_asr = int_asr
 
--- Comparisons on tagged ints
 function caml_eq(a, b) return a == b end
 function caml_neq(a, b) return a ~= b end
 function caml_lt(a, b) return a < b end
@@ -107,50 +145,71 @@ function caml_greaterequal(a, b) return a >= b end
 function caml_lessthan(a, b) return a < b end
 function caml_greaterthan(a, b) return a > b end
 
--- Not / IsInt
 function caml_not(x) return (x == 0) and 2 or 0 end
 function caml_is_int(x) return type(x) == "number" end
 
----- Block operations ----
+-- lua_of_ocaml runtime: block and object operations
+-- Provides: caml_obj_tag caml_obj_block caml_obj_dup caml_obj_set_raw_field
+
 function caml_obj_tag(b)
   if type(b) == "table" then return b[1] or 0 else return 0 end
 end
+
 function caml_obj_block(tag, ...)
   local b = { tag }
   for i = 1, select("#", ...) do b[i + 1] = select(i, ...) end
   return b
 end
+
 function caml_obj_dup(b)
   local n = { b[1] }
   for i = 2, #b do n[i] = b[i] end
   return n
 end
+
 function caml_obj_set_raw_field(b, i, v) b[i + 2] = v end
 
----- Exception support ----
+-- lua_of_ocaml runtime: exceptions
+-- Provides: caml_failwith caml_invalid_argument caml_raise
+
 function caml_failwith(msg) error(msg) end
 function caml_invalid_argument(msg) error("Invalid_argument: " .. msg) end
 function caml_raise(exn)
-  -- MVP: silently exit via sentinel
   return 0
 end
 
----- String operations ----
--- OCaml strings are Lua strings. Length is NOT tagged.
-function caml_string_length(s) return #s end
-function caml_ml_string_length(s)
-  if s == nil then return 0 end
-  return #s
-end
+-- lua_of_ocaml runtime: string and bytes operations
+-- Provides: caml_string_length caml_ml_string_length caml_string_get
+--           caml_create_string caml_create_bytes caml_ml_bytes_length
+--           caml_blit_string caml_blit_bytes caml_fill_string caml_fill_bytes
+--           caml_string_notequal caml_string_equal caml_string_compare
+--           caml_bytes_compare caml_string_concat caml_string_of_bytes caml_bytes_of_string
+
+local math_floor = math.floor
 
 function caml_string_length(s)
-  if s == nil then return 0 end
-  return #s
+  if s == nil then return 0 end return #s
 end
-function caml_string_get(s, i) return string.byte(s, math_floor(i/2) + 1) * 2 end
-function caml_create_string(len) return string.rep("\0", math_floor(len/2)) end
-function caml_create_bytes(len) return string.rep("\0", math_floor(len/2)) end
-function caml_ml_bytes_length(b) return #b end
+
+function caml_ml_string_length(s)
+  if s == nil then return 0 end return #s
+end
+
+function caml_string_get(s, i)
+  return string.byte(s, math_floor(i/2) + 1) * 2
+end
+
+function caml_create_string(len)
+  return string.rep("\0", math_floor(len/2))
+end
+
+function caml_create_bytes(len)
+  return string.rep("\0", math_floor(len/2))
+end
+
+function caml_ml_bytes_length(b)
+  if b == nil then return 0 end return #b
+end
 
 function caml_blit_string(s1, ofs1, s2, ofs2, len)
   local o1 = math_floor(ofs1 / 2) + 1
@@ -176,23 +235,124 @@ end
 
 function caml_string_notequal(a, b) return a ~= b end
 function caml_string_equal(a, b) return a == b end
+
 function caml_string_compare(a, b)
   if a < b then return -2 elseif a > b then return 2 else return 0 end
 end
-function caml_bytes_compare(a, b) return caml_string_compare(a, b) end
+
+function caml_bytes_compare(a, b)
+  return caml_string_compare(a, b)
+end
 
 function caml_string_concat(a, b) return a .. b end
 function caml_string_of_bytes(s) return s end
 function caml_bytes_of_string(s) return s end
 
----- String/number conversion ----
+-- lua_of_ocaml runtime: array and vector operations
+-- Provides: caml_vect_length caml_array_get caml_array_set
+--           caml_array_unsafe_get caml_array_unsafe_set
+
+local math_floor = math.floor
+
+function caml_vect_length(v) return (#v - 1) * 2 end
+function caml_array_get(v, i) return v[math_floor(i / 2) + 2] or 0 end
+function caml_array_set(v, i, x) v[math_floor(i / 2) + 2] = x; return 0 end
+function caml_array_unsafe_get(v, i) return caml_array_get(v, i) end
+function caml_array_unsafe_set(v, i, x) return caml_array_set(v, i, x) end
+
+-- lua_of_ocaml runtime: channel I/O
+-- Provides: caml_ml_open_descriptor_in caml_ml_open_descriptor_out
+--           caml_ml_output caml_ml_output_bytes caml_ml_output_char caml_ml_output_int
+--           caml_ml_input caml_ml_input_char caml_ml_input_int caml_ml_input_scan_line
+--           caml_ml_flush caml_ml_out_channels_list
+--           caml_ml_channel_size caml_ml_channel_size_64 caml_ml_pos_in caml_ml_pos_in_64
+--           caml_ml_pos_out caml_ml_pos_out_64 caml_ml_seek_in caml_ml_seek_in_64
+--           caml_ml_seek_out caml_ml_seek_out_64 caml_ml_set_binary_mode
+--           caml_ml_set_channel_name caml_ml_close_channel
+
+local math_floor = math.floor
+
+caml_ml_out_channels_list = function() return { 0, 0, 0 } end
+
+function caml_ml_open_descriptor_in(fd) return fd end
+function caml_ml_open_descriptor_out(fd) return fd end
+
+function caml_ml_output(chan, s, ofs, len)
+  if s == nil then return 0 end
+  local o = math_floor(ofs / 2) + 1
+  local l = math_floor(len / 2)
+  io.write(string.sub(s, o, o + l - 1))
+  return 0
+end
+
+function caml_ml_output_bytes(chan, b, ofs, len)
+  return caml_ml_output(chan, b, ofs, len)
+end
+
+function caml_ml_output_char(chan, c)
+  io.write(string.char(math_floor(c / 2)))
+  return 0
+end
+
+function caml_ml_output_int(chan, i)
+  io.write(tostring(math_floor(i / 2)))
+  return 0
+end
+
+function caml_ml_flush(_chan) io.flush(); return 0 end
+
+function caml_ml_input_char(chan)
+  local c = io.read(1)
+  if c == nil then return 0 end
+  return string.byte(c) * 2
+end
+
+function caml_ml_input(chan, s, ofs, len)
+  local o = math_floor(ofs / 2) + 1
+  local l = math_floor(len / 2)
+  local data = io.read(l)
+  if data == nil then return 0 end
+  return caml_blit_string(data, 0, s, ofs, #data * 2)
+end
+
+function caml_ml_input_int(chan)
+  local n = tonumber(io.read("*n"))
+  if n == nil then return 0 end return n * 2
+end
+
+function caml_ml_input_scan_line(chan)
+  local line = io.read("*l")
+  if line == nil then return 0 end return line
+end
+
+function caml_ml_channel_size(_chan) return 0 end
+function caml_ml_channel_size_64(_chan) return 0 end
+function caml_ml_pos_in(_chan) return 0 end
+function caml_ml_pos_in_64(_chan) return 0 end
+function caml_ml_pos_out(_chan) return 0 end
+function caml_ml_pos_out_64(_chan) return 0 end
+function caml_ml_seek_in(_chan, _pos) return 0 end
+function caml_ml_seek_in_64(_chan, _pos) return 0 end
+function caml_ml_seek_out(_chan, _pos) return 0 end
+function caml_ml_seek_out_64(_chan, _pos) return 0 end
+function caml_ml_set_binary_mode(_chan, _mode) return 0 end
+function caml_ml_set_channel_name(_chan, _name) return 0 end
+function caml_ml_close_channel(_chan) return 0 end
+
+-- lua_of_ocaml runtime: format, conversion, and misc
+-- Provides: caml_format_int caml_format_float caml_int_of_string caml_float_of_string
+--           caml_string_of_int caml_int64_float_of_bits caml_int64_bits_of_float
+--           caml_sys_exit caml_sys_open caml_input_value caml_output_value
+--           caml_atomic_cas_field caml_atomic_load_field caml_atomic_exchange_field
+--           caml_atomic_store_field caml_atomic_set_field
+
+local math_floor = math.floor
+
 function caml_format_int(fmt, i)
   return string.format(fmt, math_floor(i / 2))
 end
 
 function caml_format_float(fmt, f)
-  -- f is a boxed float (table with tag 253)
-  -- For now, just return "0.0"
   if type(f) == "table" then return "0.0" end
   return string.format(fmt, f)
 end
@@ -209,91 +369,14 @@ function caml_string_of_int(i)
   return tostring(math_floor(i / 2))
 end
 
--- Int64 stubs
 function caml_int64_float_of_bits(_) return 0 end
 function caml_int64_bits_of_float(_) return 0 end
 
----- Channel I/O ----
-caml_ml_out_channels_list = function() return { 0, 0, 0 } end
-
-function caml_ml_open_descriptor_in(fd) return fd end
-function caml_ml_open_descriptor_out(fd) return fd end
-
-function caml_ml_output(chan, s, ofs, len)
-  if s == nil then return 0 end
-  local o = math_floor(ofs / 2) + 1
-  local l = math_floor(len / 2)
-  local ss = string.sub(s, o, o + l - 1)
-  io.write(ss)
-  return 0
-end
-
-function caml_ml_output_bytes(chan, b, ofs, len)
-  return caml_ml_output(chan, b, ofs, len)
-end
-
-function caml_ml_output_char(chan, c)
-  local ch = string.char(math_floor(c / 2))
-  io.write(ch)
-  return 0
-end
-
-function caml_ml_output_int(chan, i)
-  local s = tostring(math_floor(i / 2))
-  io.write(s)
-  return 0
-end
-
-function caml_ml_flush(_chan) io.flush(); return 0 end
-
-function caml_ml_input_char(chan)
-  local c = io.read(1)
-  if c == nil then return 0 end
-  return string.byte(c) * 2  -- return tagged int EOF marker for actual EOF
-end
-
-function caml_ml_input(chan, s, ofs, len)
-  local o = math_floor(ofs / 2) + 1
-  local l = math_floor(len / 2)
-  local data = io.read(l)
-  if data == nil then return 0 end
-  return caml_blit_string(data, 0, s, ofs, #data * 2)
-end
-
-function caml_ml_input_int(chan)
-  local n = tonumber(io.read("*n"))
-  if n == nil then return 0 end
-  return n * 2
-end
-
-function caml_ml_input_scan_line(chan)
-  local line = io.read("*l")
-  if line == nil then return 0 end
-  return line
-end
-
--- Channel position/size stubs
-function caml_ml_channel_size(_chan) return 0 end
-function caml_ml_channel_size_64(_chan) return 0 end
-function caml_ml_pos_in(_chan) return 0 end
-function caml_ml_pos_in_64(_chan) return 0 end
-function caml_ml_pos_out(_chan) return 0 end
-function caml_ml_pos_out_64(_chan) return 0 end
-function caml_ml_seek_in(_chan, _pos) return 0 end
-function caml_ml_seek_in_64(_chan, _pos) return 0 end
-function caml_ml_seek_out(_chan, _pos) return 0 end
-function caml_ml_seek_out_64(_chan, _pos) return 0 end
-function caml_ml_set_binary_mode(_chan, _mode) return 0 end
-function caml_ml_set_channel_name(_chan, _name) return 0 end
-function caml_ml_close_channel(_chan) return 0 end
-
--- Sys stubs
 function caml_sys_exit(code) os.exit(math_floor(code / 2)) end
 function caml_sys_open(_path, _flags, _perm) return 0 end
 
----- Atomic operations (field access on OCaml blocks) ----
--- OCaml blocks: Lua table {tag, field0, field1, ...}
--- field index n (tagged int) → position n/2 + 2 in the Lua table
+function caml_input_value(_chan) return 0 end
+function caml_output_value(_chan, _v) return 0 end
 
 function caml_atomic_load_field(obj, field_idx)
   local pos = math_floor(field_idx / 2) + 2
@@ -302,85 +385,25 @@ end
 
 function caml_atomic_cas_field(obj, field_idx, old_val, new_val, _success)
   local pos = math_floor(field_idx / 2) + 2
-  if obj[pos] == old_val then
-    obj[pos] = new_val
-    return 2  -- true (tagged)
-  end
-  return 0  -- false
+  if obj[pos] == old_val then obj[pos] = new_val; return 2 end
+  return 0
 end
 
 function caml_atomic_exchange_field(obj, field_idx, new_val)
   local pos = math_floor(field_idx / 2) + 2
-  local old = obj[pos] or 0
-  obj[pos] = new_val
-  return old
+  local old = obj[pos] or 0; obj[pos] = new_val; return old
 end
 
 function caml_atomic_store_field(obj, field_idx, val)
-  local pos = math_floor(field_idx / 2) + 2
-  obj[pos] = val
-  return 0
+  local pos = math_floor(field_idx / 2) + 2; obj[pos] = val; return 0
 end
 
 function caml_atomic_set_field(obj, field_idx, val)
-  local pos = math_floor(field_idx / 2) + 2
-  obj[pos] = val
-  return 0
+  local pos = math_floor(field_idx / 2) + 2; obj[pos] = val; return 0
 end
 
----- Marshal stubs ----
-function caml_input_value(_chan) return 0 end
-function caml_output_value(_chan, _v) return 0 end
-
----- Vector operations ----
-function caml_vect_length(v) return (#v - 1) * 2 end
-function caml_array_get(v, i) return v[math_floor(i / 2) + 2] or 0 end
-function caml_array_set(v, i, x) v[math_floor(i / 2) + 2] = x; return 0 end
-function caml_array_unsafe_get(v, i) return caml_array_get(v, i) end
-function caml_array_unsafe_set(v, i, x) return caml_array_set(v, i, x) end
-
----- Call support ----
-function caml_call_gen(f, ...)
-  local arity = f.arity or 0
-  local nargs = select("#", ...)
-  if arity == nargs then
-    return f(...)
-  elseif arity < nargs then
-    local args = { ... }
-    local r = f(unpack(args, 1, arity))
-    for i = arity + 1, nargs do r = r(args[i]) end
-    return r
-  else
-    local args = { ... }
-    return function(...)
-      local all = {}
-      for i = 1, nargs do all[i] = args[i] end
-      for i = 1, select("#", ...) do all[nargs + i] = select(i, ...) end
-      if #all >= arity then
-        return caml_call_gen(f, unpack(all, 1, arity))
-      else
-        return caml_call_gen(f, unpack(all))
-      end
-    end
-  end
-end
-
----- Exception frame binding ----
-function caml_set_global(name, value)
-  _G[name] = value
-end
-
-function caml_bind_frame(f)
-  local param_names = f[3]
-  local arg_values = f[4]
-  for i = 1, #param_names do
-    _G[param_names[i]] = arg_values[i]
-  end
-end
-
----- Misc ----
-
-_main = function() Out_of_memory_359 = nil
+_main = function() -- src: <unknown>
+Out_of_memory_359 = nil
 Sys_error_361 = nil
 Failure_347 = nil
 Invalid_argument_341 = nil
@@ -7349,7 +7372,4 @@ _v1011 = 0
 return
  end
 _main()
-
--- Entry point
-local ok, err = pcall(_main)
-if not ok then io.stderr:write("ERROR: " .. tostring(err) .. "\n") end
+_main()

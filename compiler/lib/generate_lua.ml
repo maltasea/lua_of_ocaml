@@ -64,9 +64,19 @@ let rec translate_expr blocks = function
   | Code.Block (tag, fields, _, _) ->
       make_block (L.int_ tag) (Array.to_list (Array.map ~f:evar fields))
   | Code.Field (x, n, _) -> block_field (evar x) n
-  | Code.Closure (params, (pc, _), _) ->
+  | Code.Closure (params, (pc, _), cloc) ->
       let params' = List.map params ~f:ident_of_var in
-      L.EFun (params', compile_closure blocks pc, false)
+      let body = compile_closure blocks pc in
+      let body = match cloc with
+        | Some pi ->
+            let file = match pi.src with
+              | Some f -> Filename.basename f
+              | None -> "?"
+            in
+            L.Comment (Printf.sprintf "%s:%d" file pi.line) :: body
+        | None -> body
+      in
+      L.EFun (params', body, false)
   | Code.Constant c -> translate_constant c
   | Code.Prim (p, args) -> translate_prim p args
   | Code.Special (Code.Alias_prim name) ->
@@ -127,7 +137,12 @@ and translate_instr blocks = function
       [L.Assign ([block_field (evar x) 0], [rhs])]
   | Code.Array_set (x, y, z) ->
       [L.Assign ([L.access (evar x) (L.bin L.Add (evar y) one)], [evar z])]
-  | Code.Event _ -> []
+  | Code.Event pi ->
+      let file = match pi.src with
+        | Some f -> Filename.basename f
+        | None -> "?"
+      in
+      [L.Comment (Printf.sprintf "%s:%d" file pi.line)]
 
 (* ---- Scope stack for break/continue ---- *)
 
@@ -356,7 +371,15 @@ let compile_program (p : Code.program) =
   let body = compile_closure p.blocks p.start in
   let params = (Code.Addr.Map.find p.start p.blocks).params in
   let fn_params = List.map params ~f:ident_of_var in
+  (* Find first event in start block for a source comment *)
+  let start_block = Code.Addr.Map.find p.start p.blocks in
+  let src_comment = match get_body start_block with
+    | Code.Event pi :: _ ->
+        let file = match pi.src with Some f -> Filename.basename f | None -> "?" in
+        [L.Comment (Printf.sprintf "src: %s:%d" file pi.line)]
+    | _ -> [L.Comment "src: <unknown>"]
+  in
   [ L.FunAssign (L.EVar (L.ident "_main"), fn_params,
-                  List.rev !var_decls @ body)
+                  src_comment @ List.rev !var_decls @ body)
   ; L.ExprStmt (L.call (L.EVar (L.ident "_main")) [])
   ]

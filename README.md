@@ -3,6 +3,16 @@ lua_of_ocaml — OCaml to Lua 5.1 Compiler
 
 Compiles OCaml bytecode programs to Lua 5.1, inspired by js_of_ocaml.
 
+> **Note:** this project was written in a heavily guided, multi-hour
+> chat session with Claude Code (Claude Opus 4.7) — nothing agentic.
+
+## Source tracing (MVP)
+
+Generated Lua includes `-- file:line` comments at closure boundaries and
+block entry points, mapping back to the original OCaml source. Compile
+your OCaml with `-g` to include debug info:
+
+    ocamlc -g -o hello.byte hello.ml
 First steps
 -----------
 

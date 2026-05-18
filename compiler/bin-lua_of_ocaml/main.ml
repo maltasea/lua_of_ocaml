@@ -2,24 +2,43 @@
 
 open Js_of_ocaml_compiler.Stdlib
 module Parse_bytecode = Js_of_ocaml_compiler.Parse_bytecode
-module Runtime_lua = Lua_of_ocaml_compiler.Runtime_lua
 module Generate_lua = Lua_of_ocaml_compiler.Generate_lua
 module Lua_output = Lua_of_ocaml_compiler.Lua_output
 
 let () =
   Sys.catch_break true;
-  Js_of_ocaml_compiler.Config.set_target `JavaScript;
-  ()
+  Js_of_ocaml_compiler.Config.set_target `JavaScript
 
-let write_output ~runtime oc lua_prog =
-  Printf.eprintf "Generated %d statements\n" (List.length lua_prog);
+(* Runtime files are loaded from runtime/lua/ directory *)
+
+let runtime_dir = "runtime/lua"
+
+let runtime_files =
+  [ "stdlib.lua"; "ints.lua"; "obj.lua"; "fail.lua"
+  ; "string.lua"; "array.lua"; "io.lua"; "misc.lua"
+  ]
+
+let load_runtime () =
+  let buf = Buffer.create 4096 in
+  List.iter runtime_files ~f:(fun f ->
+      let path = Filename.concat runtime_dir f in
+      if Sys.file_exists path then (
+        let ic = open_in_bin path in
+        let content = really_input_string ic (in_channel_length ic) in
+        close_in ic;
+        Buffer.add_string buf content;
+        Buffer.add_char buf '\n')
+      else
+        Printf.eprintf "WARNING: runtime file not found: %s\n" path);
+  Buffer.contents buf
+
+let write_output ~runtime:_ ~source_file oc lua_prog =
   let fmt = Js_of_ocaml_compiler.Pretty_print.to_out_channel oc in
-  if runtime then (
-    Js_of_ocaml_compiler.Pretty_print.string fmt Runtime_lua.preamble;
-    Js_of_ocaml_compiler.Pretty_print.newline fmt);
+  Js_of_ocaml_compiler.Pretty_print.string fmt
+    (Printf.sprintf "-- source: %s\n" source_file);
+  Js_of_ocaml_compiler.Pretty_print.string fmt (load_runtime ());
   Lua_output.program fmt lua_prog;
-  if runtime then (
-    Js_of_ocaml_compiler.Pretty_print.string fmt Runtime_lua.postamble)
+  Js_of_ocaml_compiler.Pretty_print.string fmt "_main()\n"
 
 let run input_file output_file =
   let ic = open_in_bin input_file in
@@ -33,7 +52,7 @@ let run input_file output_file =
          | Some f -> open_out_bin f
          | None -> stdout
        in
-       write_output ~runtime:true oc lua_prog;
+       write_output ~runtime:true ~source_file:input_file oc lua_prog;
        if Option.is_some output_file then close_out oc
    | `Cmo (compunit) ->
        let parsed = Parse_bytecode.from_cmo compunit ic in
@@ -43,7 +62,7 @@ let run input_file output_file =
          | Some f -> open_out_bin f
          | None -> stdout
        in
-       write_output ~runtime:true oc lua_prog;
+       write_output ~runtime:true ~source_file:input_file oc lua_prog;
        if Option.is_some output_file then close_out oc
    | `Cma lib ->
        let parsed = Parse_bytecode.from_cma lib ic in
@@ -53,7 +72,7 @@ let run input_file output_file =
          | Some f -> open_out_bin f
          | None -> stdout
        in
-       write_output ~runtime:true oc lua_prog;
+       write_output ~runtime:true ~source_file:input_file oc lua_prog;
        if Option.is_some output_file then close_out oc)
 
 let () =
