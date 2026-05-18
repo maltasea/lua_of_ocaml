@@ -1,5 +1,5 @@
-lua_of_ocaml — OCaml to Lua 5.1 Compiler
-==========================================
+lua_of_ocaml — OCaml to Lua Compiler
+====================================
 
 Compiles OCaml programs to Lua 5.1, inspired by js_of_ocaml.
 

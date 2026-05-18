@@ -132,6 +132,10 @@ function caml_obj_set_raw_field(b, i, v) b[i + 2] = v end
 ---- Exception support ----
 function caml_failwith(msg) error(msg) end
 function caml_invalid_argument(msg) error("Invalid_argument: " .. msg) end
+function caml_raise(exn)
+  -- MVP: silently exit via sentinel
+  return 0
+end
 
 ---- String operations ----
 -- OCaml strings are Lua strings. Length is NOT tagged.
@@ -218,11 +222,10 @@ function caml_ml_open_descriptor_in(fd) return fd end
 function caml_ml_open_descriptor_out(fd) return fd end
 
 function caml_ml_output(chan, s, ofs, len)
-  if s == nil then io.stderr:write("[nil len="..tostring(len).."]\n"); return 0 end
+  if s == nil then return 0 end
   local o = math_floor(ofs / 2) + 1
   local l = math_floor(len / 2)
   local ss = string.sub(s, o, o + l - 1)
-  io.stderr:write("[OUT:'" .. ss .. "']\n")
   io.write(ss)
   return 0
 end
@@ -232,12 +235,14 @@ function caml_ml_output_bytes(chan, b, ofs, len)
 end
 
 function caml_ml_output_char(chan, c)
-  io.write(string.char(math_floor(c / 2)))
+  local ch = string.char(math_floor(c / 2))
+  io.write(ch)
   return 0
 end
 
 function caml_ml_output_int(chan, i)
-  io.write(tostring(math_floor(i / 2)))
+  local s = tostring(math_floor(i / 2))
+  io.write(s)
   return 0
 end
 

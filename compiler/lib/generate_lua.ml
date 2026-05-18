@@ -5,6 +5,9 @@ module L = Lua
 module Code = Js_of_ocaml_compiler.Code
 module Targetint = Js_of_ocaml_compiler.Targetint
 
+(* Global ref for blocks map, set by compile_program *)
+let current_blocks : Code.block Code.Addr.Map.t ref = ref Code.Addr.Map.empty
+
 (* ---- Variable naming ---- *)
 
 let lua_safe_name s =
@@ -22,133 +25,16 @@ let var_name v =
   match Code.Var.get_name v with
   | Some n ->
       let s = lua_safe_name n in
-      if String.length s = 0
-      then Printf.sprintf "_v%d" (Code.Var.idx v)
-      else Printf.sprintf "%s_%d" s (Code.Var.idx v)
+      Printf.sprintf "%s_%d" s (Code.Var.idx v)
   | None -> Printf.sprintf "_v%d" (Code.Var.idx v)
 
 let ident_of_var v = L.S { name = var_name v; var = Some v }
 let evar v = L.EVar (ident_of_var v)
-
-(* ---- Helper expressions ---- *)
-
 let one = L.int_ 1
 let two = L.int_ 2
-
-(* Block field access: Lua 1-based, plus 1 for tag slot at index 1.
-   So field n is at position n+2 in the Lua table. *)
 let block_field e n = L.access e (L.int_ (n + 2))
-
-(* Tag is always at position 1 *)
-let block_tag e = L.access e (L.int_ 1)
-
-(* is_block: type(x) ~= "number" *)
-let is_block e =
-  let type_call = L.call (L.EVar (L.ident "type")) [e] in
-  L.bin L.Neq type_call (L.string_ "number")
-
-(* is_int: type(x) == "number" *)
-let is_int e =
-  let type_call = L.call (L.EVar (L.ident "type")) [e] in
-  L.bin L.Eq type_call (L.string_ "number")
-
-(* OCaml int to Lua: shift right by 1 (arithmetic)
-   In Lua, we use math.floor(n / 2) or (n // 2) but Lua 5.1 doesn't have //.
-   We use math.floor(n / 2) for unwrap.
-   For tag test, we check type(x) == "number"
-   For operations on tagged ints:
-     add: a + b (since both are shifted, (2a + 2b) = 2(a+b), no adjustment needed)
-     sub: a - b (same logic)
-     mul: (a // 2) * b (unwrap one operand to avoid double shift)
-     div: (a // 2) // (b // 2) * 2
-*)
-
-let int_add a b = L.bin L.Add a b
-let int_sub a b = L.bin L.Sub a b
-
-let int_mul a b =
-  (* a * b / 2 -- unwrap the double shift *)
-  let floor = L.EVar (L.ident "math_floor") in
-  let prod = L.bin L.Mul a b in
-  L.call floor [L.bin L.Div prod two]
-
-let int_div a b =
-  (* (a / 2) / (b / 2) * 2... actually:
-     In jsoo, div works on tagged ints. The formula is:
-     (a >> 1) / (b >> 1) << 1
-     In Lua: let a2 = floor(a/2), b2 = floor(b/2), then floor(a2/b2) * 2
-  *)
-  let floor = L.EVar (L.ident "math_floor") in
-  let a2 = L.call floor [L.bin L.Div a two] in
-  let b2 = L.call floor [L.bin L.Div b two] in
-  L.bin L.Mul (L.call floor [L.bin L.Div a2 b2]) two
-
-let int_mod a b =
-  (* In jsoo: a % b, where both are tagged.
-     Lua's % works on floats, so we need:
-     let a2 = floor(a/2), b2 = floor(b/2)
-     a2 % b2 * 2 + (a2 % b2 < 0 ? b2 * 2 : 0)
-  *)
-  let floor = L.EVar (L.ident "math_floor") in
-  let a2 = L.call floor [L.bin L.Div a two] in
-  let b2 = L.call floor [L.bin L.Div b two] in
-  let mod_val = L.bin L.Mod a2 b2 in
-  (* ensure positive *)
-  let adjust = L.bin L.Mul two b2 in
-  L.bin L.Add (L.bin L.Mul mod_val two)
-    (L.ECall (L.EVar (L.ident "caml_mod_adjust"), [mod_val; adjust]))
-
-let int_and a b =
-  (* Lua 5.1 has no bitwise ops. Use math.floor(a/2) to untag, then we'd need
-     bit32 library. For MVP, use a runtime function. *)
-  let f = L.EVar (L.ident "caml_and") in
-  L.call f [a; b]
-
-let int_or a b =
-  let f = L.EVar (L.ident "caml_or") in
-  L.call f [a; b]
-
-let int_xor a b =
-  let f = L.EVar (L.ident "caml_xor") in
-  L.call f [a; b]
-
-let int_lsl a b =
-  let f = L.EVar (L.ident "caml_lsl") in
-  L.call f [a; b]
-
-let int_lsr a b =
-  let f = L.EVar (L.ident "caml_lsr") in
-  L.call f [a; b]
-
-let int_asr a b =
-  let f = L.EVar (L.ident "caml_asr") in
-  L.call f [a; b]
-
-(* ---- Integer comparison on tagged ints ---- *)
-
-let int_eq a b = L.bin L.Eq a b
-let int_ne a b = L.bin L.Neq a b
-let int_lt a b = L.bin L.Lt a b
-let int_le a b = L.bin L.Le a b
-let int_gt a b = L.bin L.Gt a b
-let int_ge a b = L.bin L.Ge a b
-
-(* ---- Globals ---- *)
-
-let global_data = L.EVar (L.ident "caml_global_data")
-let global_get idx = L.access global_data (L.int_ (idx + 1))
-let global_set idx e = L.assign [L.access global_data (L.int_ (idx + 1))] [e]
-
-(* ---- Block construction ---- *)
-
 let make_block tag fields =
-  let tag = L.TArray tag in
-  let fields = List.map fields ~f:(fun e -> L.TArray e) in
-  L.table (tag :: fields)
-
-(* ---- String representation ----
-   OCaml strings: in jsoo, strings are JS strings. In Lua, strings are native.
-   We pass through directly for now. *)
+  L.table (L.TArray tag :: List.map fields ~f:(fun f -> L.TArray f))
 
 (* ---- Constant translation ---- *)
 
@@ -157,7 +43,7 @@ let rec translate_constant = function
   | Code.NativeString (Code.Native_string.Byte s) -> L.string_ s
   | Code.NativeString _ -> L.string_ ""
   | Code.Int i ->
-      let n = Int32.(to_int (shift_left (Targetint.to_int32 i) 1)) in
+      let n = Targetint.(shift_left i 1 |> to_int_exn) in
       L.int_ n
   | Code.Int32 i ->
       let n = Int32.(to_int (shift_left i 1)) in
@@ -165,228 +51,210 @@ let rec translate_constant = function
   | Code.NativeInt i ->
       let n = Int32.(to_int (shift_left i 1)) in
       L.int_ n
-  | Code.Float _f ->
-      make_block (L.int_ 253) [L.int_ 0]
+  | Code.Float _ -> make_block (L.int_ 253) [L.int_ 0]
   | Code.Tuple (tag, fields, _) ->
-      let tag = L.int_ tag in
       let fields = Array.to_list (Array.map fields ~f:translate_constant) in
-      make_block tag fields
-  | Code.Float_array _ ->
-      make_block (L.int_ 253) [L.int_ 0]
-  | Code.Int64 _ ->
-      L.int_ 0
+      make_block (L.int_ tag) fields
+  | Code.Float_array _ -> make_block (L.int_ 253) [L.int_ 0]
+  | Code.Int64 _ -> L.int_ 0
 
 (* ---- Expression translation ---- *)
 
 let rec translate_expr = function
   | Code.Apply { f; args; _ } ->
-      let fn = evar f in
-      let args = List.map args ~f:evar in
-      L.call fn args
+      L.call (evar f) (List.map args ~f:evar)
   | Code.Block (tag, fields, _, _) ->
-      let tag = L.int_ tag in
-      let fields = Array.to_list (Array.map fields ~f:evar) in
-      make_block tag fields
-  | Code.Field (x, n, _) ->
-      block_field (evar x) n
+      make_block (L.int_ tag) (Array.to_list (Array.map fields ~f:evar))
+  | Code.Field (x, n, _) -> block_field (evar x) n
   | Code.Closure (params, (pc, _), _) ->
-      (* We need to compile the closure body *)
-      compile_closure_expr (pc, params) params
-  | Code.Constant c ->
-      translate_constant c
-  | Code.Prim (p, args) ->
-      translate_prim p args
+      let params' = List.map params ~f:ident_of_var in
+      L.EFun (params', closure_body pc, false)
+  | Code.Constant c -> translate_constant c
+  | Code.Prim (p, args) -> translate_prim p args
   | Code.Special (Code.Alias_prim name) ->
-      L.EVar (L.ident name)
+      L.EVar (L.ident (clean_extern name))
+
+and clean_extern name =
+  if String.length name > 0 && Char.equal name.[0] '%'
+  then String.sub name ~pos:1 ~len:(String.length name - 1)
+  else name
 
 and translate_prim p args =
-  let prim_to_val a = match a with Code.Pv v -> evar v | Code.Pc c -> translate_constant c in
+  let pa a = match a with Code.Pv v -> evar v | Code.Pc c -> translate_constant c in
   match p, args with
-  | Code.Vectlength, [a] ->
-      L.bin L.Sub (L.EUn (L.Len, prim_to_val a)) one
-  | Code.Array_get, [a; b] ->
-      L.access (prim_to_val a) (L.bin L.Add (prim_to_val b) one)
-  | Code.Not, [a] ->
-      L.EUn (L.Not, prim_to_val a)
+  | Code.Vectlength, [a] -> L.bin L.Sub (L.EUn (L.Len, pa a)) one
+  | Code.Array_get, [a; b] -> L.access (pa a) (L.bin L.Add (pa b) one)
+  | Code.Not, [a] -> L.EUn (L.Not, pa a)
   | Code.IsInt, [a] ->
-      is_int (prim_to_val a)
-  | Code.Eq, [a; b] ->
-      int_eq (prim_to_val a) (prim_to_val b)
-  | Code.Neq, [a; b] ->
-      int_ne (prim_to_val a) (prim_to_val b)
-  | Code.Lt, [a; b] ->
-      int_lt (prim_to_val a) (prim_to_val b)
-  | Code.Le, [a; b] ->
-      int_le (prim_to_val a) (prim_to_val b)
-  | Code.Ult, [a; b] ->
-      int_lt (prim_to_val a) (prim_to_val b)
+      L.bin L.Eq (L.call (L.EVar (L.ident "type")) [pa a]) (L.string_ "number")
+  | Code.Eq, [a; b] -> L.bin L.Eq (pa a) (pa b)
+  | Code.Neq, [a; b] -> L.bin L.Neq (pa a) (pa b)
+  | Code.Lt, [a; b] -> L.bin L.Lt (pa a) (pa b)
+  | Code.Le, [a; b] -> L.bin L.Le (pa a) (pa b)
+  | Code.Ult, [a; b] -> L.bin L.Lt (pa a) (pa b)
   | Code.Extern name, args ->
-      let name = if String.length name > 0 && Char.equal name.[0] '%'
-        then String.sub name ~pos:1 ~len:(String.length name - 1)
-        else name
-      in
-      L.call (L.EVar (L.ident name)) (List.map args ~f:prim_to_val)
+      L.call (L.EVar (L.ident (clean_extern name))) (List.map args ~f:pa)
   | _ ->
-      let name = match p with
-        | Code.Extern s -> s
-        | _ -> "caml_prim"
+      L.call (L.EVar (L.ident "caml_prim_missing")) (List.map args ~f:pa)
+
+(* ---- Closure body: compile inner CFG as a while-switch trampoline ---- *)
+
+and closure_body entry_pc =
+  let visited = ref Code.Addr.Set.empty in
+  let blocks : (Code.Addr.t * Js_of_ocaml_compiler.Code.block) list ref = ref [] in
+  let rec collect pc =
+    if not (Code.Addr.Set.mem pc !visited) then (
+      visited := Code.Addr.Set.add pc !visited;
+      let b = Code.Addr.Map.find pc !current_blocks in
+      blocks := (pc, b) :: !blocks;
+      (* Follow closures within instructions *)
+      List.iter b.body ~f:(fun instr ->
+          match instr with
+          | Code.Let (_, Code.Closure (_, (pc', _), _)) ->
+              if Code.Addr.Map.mem pc' !current_blocks then collect pc'
+          | _ -> ());
+      (* Follow control flow *)
+      match b.branch with
+      | Code.Branch (pc', _) -> collect pc'
+      | Code.Cond (_, (pc1, _), (pc2, _)) -> collect pc1; collect pc2
+      | Code.Switch (_, cases) -> Array.iter cases ~f:(fun (pc', _) -> collect pc')
+      | Code.Pushtrap ((pc_h, _), _, (pc_c, _)) -> collect pc_h; collect pc_c
+      | Code.Poptrap _ | Code.Return _ | Code.Raise _ | Code.Stop -> ())
+  in
+  collect entry_pc;
+
+  (* Helper accessors — need explicit type annotation for record field access *)
+  let get_params (b : Js_of_ocaml_compiler.Code.block) = b.params in
+  let get_body (b : Js_of_ocaml_compiler.Code.block) = b.body in
+  let get_branch (b : Js_of_ocaml_compiler.Code.block) = b.branch in
+
+  (* Forward-declare all variables: block params + Let-bound vars *)
+  let var_set = ref Code.Var.Set.empty in
+  let var_decls = ref [] in
+  let declare v =
+    if not (Code.Var.Set.mem v !var_set) then (
+      var_set := Code.Var.Set.add v !var_set;
+      var_decls := L.Assign ([evar v], [L.nil]) :: !var_decls)
+  in
+  List.iter !blocks ~f:(fun (_pc, b) ->
+      let params = get_params b in
+      let body = get_body b in
+      let branch = get_branch b in
+      List.iter params ~f:declare;
+      List.iter body ~f:(fun instr ->
+          match instr with
+          | Code.Let (x, _) -> declare x
+          | _ -> ());
+      (* Also collect vars from branch instructions *)
+      (match branch with
+       | Code.Pushtrap (_, x, _) -> declare x
+       | _ -> ()));
+
+  let pc_var = L.ident "_pc" in
+  let pc_init = L.Assign ([L.EVar pc_var], [L.int_ (entry_pc :> int)]) in
+  let switch_cases = List.rev_map !blocks ~f:(fun (pc, b) ->
+      let body = get_body b in
+      let branch = get_branch b in
+      let pc_val = L.int_ (pc :> int) in
+      let instr_stmts = List.concat_map body ~f:(function
+          | Code.Let (x, e) -> [L.Assign ([evar x], [translate_expr e])]
+          | Code.Assign (x, y) -> [L.Assign ([evar x], [evar y])]
+          | Code.Set_field (x, n, _, y) ->
+              [L.Assign ([block_field (evar x) n], [evar y])]
+          | Code.Offset_ref (x, n) ->
+              let f = block_field (evar x) 0 in
+              let rhs = match n with
+                | 0 -> f
+                | 1 -> L.bin L.Add f one
+                | -1 -> L.bin L.Sub f one
+                | n when n < 0 -> L.bin L.Sub f (L.int_ (-n))
+                | _ -> L.bin L.Add f (L.int_ n)
+              in
+              [L.Assign ([block_field (evar x) 0], [rhs])]
+          | Code.Array_set (x, y, z) ->
+              [L.Assign ([L.access (evar x) (L.bin L.Add (evar y) one)], [evar z])]
+          | Code.Event _ -> [])
       in
-      let name = if String.length name > 0 && Char.equal name.[0] '%'
-        then String.sub name ~pos:1 ~len:(String.length name - 1)
-        else name
+      let term_stmts = match branch with
+        | Code.Return x -> [L.Return [evar x]]
+        | Code.Raise (x, _) ->
+            [L.ExprStmt (L.call (L.EVar (L.ident "caml_raise")) [evar x]);
+             L.Assign ([L.EVar pc_var], [L.int_ (-1)])]
+        | Code.Stop -> [L.Return []]
+        | Code.Branch (pc', args) ->
+            let tgt = get_params (Code.Addr.Map.find pc' !current_blocks) in
+            let assigns = List.map2 tgt args ~f:(fun p a ->
+                L.Assign ([evar p], [evar a]))
+            in
+            assigns @ [L.Assign ([L.EVar pc_var], [L.int_ (pc' :> int)])]
+        | Code.Cond (x, (pc1, args1), (pc2, args2)) ->
+            let tgt1 = get_params (Code.Addr.Map.find pc1 !current_blocks) in
+            let tgt2 = get_params (Code.Addr.Map.find pc2 !current_blocks) in
+            let body1 = List.map2 tgt1 args1 ~f:(fun p a ->
+                L.Assign ([evar p], [evar a]))
+            in
+            let body2 = List.map2 tgt2 args2 ~f:(fun p a ->
+                L.Assign ([evar p], [evar a]))
+            in
+            [L.If (evar x,
+                   body1 @ [L.Assign ([L.EVar pc_var], [L.int_ (pc1 :> int)])],
+                   [],
+                   Some (body2 @ [L.Assign ([L.EVar pc_var], [L.int_ (pc2 :> int)])]))]
+        | Code.Switch (x, cases) ->
+            let n = Array.length cases in
+            let rec build_cases i =
+              if i >= n then []
+              else
+                let (pc', args') = cases.(i) in
+                let tgt = get_params (Code.Addr.Map.find pc' !current_blocks) in
+                let body = List.map2 tgt args' ~f:(fun p a ->
+                    L.Assign ([evar p], [evar a]))
+                in
+                L.If (L.bin L.Eq (evar x) (L.int_ i),
+                      body @ [L.Assign ([L.EVar pc_var], [L.int_ (pc' :> int)])],
+                      [],
+                      None) :: build_cases (i + 1)
+            in
+            build_cases 0
+        | Code.Pushtrap ((_pc_h, _args_h), x, (pc_c, args_c)) ->
+            let tgt_c = get_params (Code.Addr.Map.find pc_c !current_blocks) in
+            let assigns = (if List.length tgt_c = List.length args_c
+                then List.map2 tgt_c args_c ~f:(fun p a -> L.Assign ([evar p], [evar a]))
+                else [])
+            in
+            (* Set x to a valid table initially; continuation may update it *)
+            L.Assign ([evar x], [make_block (L.int_ 0) []])
+            :: assigns
+            @ [L.Assign ([L.EVar pc_var], [L.int_ (pc_c :> int)])]
+        | Code.Poptrap (pc_after, args) ->
+            (* Continue to the block after the protected region *)
+            let tgt = get_params (Code.Addr.Map.find pc_after !current_blocks) in
+            let assigns = List.map2 tgt args ~f:(fun p a ->
+                L.Assign ([evar p], [evar a]))
+            in
+            assigns @ [L.Assign ([L.EVar pc_var], [L.int_ (pc_after :> int)])]
       in
-      L.call (L.EVar (L.ident name)) (List.map args ~f:prim_to_val)
+      (pc_val, instr_stmts @ term_stmts))
+  in
 
-(* ---- Closure compilation ----
-   We compile closures lazily: when we encounter a Closure expression,
-   we need to generate the function. To handle this, we pre-scan the program
-   for all closure entry points and compile them as local functions. *)
+  let while_body =
+    List.concat_map switch_cases ~f:(fun (pc_val, stmts) ->
+        [L.If (L.bin L.Eq (L.EVar pc_var) pc_val, stmts, [], None)])
+  in
 
-and compile_closure_expr (pc, closure_args) _params =
-  (* For now, create a simple function wrapper.
-     The actual closure compilation happens in compile_program
-     where we have access to all blocks. *)
-  let block_name = Printf.sprintf "_block_%d" (pc : Code.Addr.t :> int) in
-  let f = L.EVar (L.ident block_name) in
-  (* Return a function that calls the block with bound args *)
-  L.EFun (List.map closure_args ~f:ident_of_var, [
-    L.Return [L.call f (List.map closure_args ~f:evar)]
-  ], false)
-
-(* ---- Instruction translation ---- *)
-
-let translate_instr = function
-  | Code.Let (x, e) ->
-      let rhs = translate_expr e in
-      let id = ident_of_var x in
-      [L.Assign ([L.EVar id], [rhs])]
-  | Code.Assign (x, y) ->
-      [L.Assign ([evar x], [evar y])]
-  | Code.Set_field (x, n, _, y) ->
-      [L.Assign ([block_field (evar x) n], [evar y])]
-  | Code.Offset_ref (x, n) ->
-      let field = block_field (evar x) 0 in
-      let rhs = match n with
-        | 1 -> L.bin L.Add field one
-        | -1 -> L.bin L.Sub field one
-        | n when n < 0 -> L.bin L.Sub field (L.int_ (-n))
-        | _ -> L.bin L.Add field (L.int_ n)
-      in
-      [L.Assign ([block_field (evar x) 0], [rhs])]
-  | Code.Array_set (x, y, z) ->
-      [L.Assign ([L.access (evar x) (L.bin L.Add (evar y) one)], [evar z])]
-  | Code.Event _ -> []
-
-(* ---- Control flow / last instruction translation ---- *)
-
-let translate_last _blocks = function
-  | Code.Return x -> [L.Return [evar x]]
-  | Code.Raise (x, _) ->
-      (* Lua error() for exceptions *)
-      [L.ExprStmt (L.call (L.EVar (L.ident "error")) [evar x])]
-  | Code.Stop -> [L.Return []]
-  | Code.Branch (pc, args) ->
-      let block_name = Printf.sprintf "_block_%d" (pc : Code.Addr.t :> int) in
-      [L.Return [L.call (L.EVar (L.ident block_name)) (List.map args ~f:evar)]]
-  | Code.Cond (x, (pc1, args1), (pc2, args2)) ->
-      let block1 = Printf.sprintf "_block_%d" (pc1 : Code.Addr.t :> int) in
-      let block2 = Printf.sprintf "_block_%d" (pc2 : Code.Addr.t :> int) in
-      let call1 = L.call (L.EVar (L.ident block1)) (List.map args1 ~f:evar) in
-      let call2 = L.call (L.EVar (L.ident block2)) (List.map args2 ~f:evar) in
-      [L.If (evar x,
-              [L.Return [call1]],
-              [],
-              Some [L.Return [call2]])]
-  | Code.Switch (x, cases) ->
-      let n = Array.length cases in
-      if n = 0 then [L.Return []]
-      else
-        let rec build_if i =
-          if i >= n then None
-          else
-            let (pc, args) = cases.(i) in
-            let block = Printf.sprintf "_block_%d" (pc : Code.Addr.t :> int) in
-            let cond = L.bin L.Eq (evar x) (L.int_ i) in
-            let then_body = [L.Return [L.call (L.EVar (L.ident block)) (List.map args ~f:evar)]] in
-            let else_body = build_if (i + 1) in
-            Some [L.If (cond, then_body, [], else_body)]
-        in
-        (match build_if 0 with Some s -> s | None -> [L.Return []])
-  | Code.Pushtrap ((pc_handler, handler_args), _x, (pc_cont, cont_args)) ->
-      (* pcall wrapper: wrap continuation in pcall *)
-      let handler_block = Printf.sprintf "_block_%d" (pc_handler : Code.Addr.t :> int) in
-      let cont_block = Printf.sprintf "_block_%d" (pc_cont : Code.Addr.t :> int) in
-      let ok_var = L.ident "ok" in
-      let res_var = L.ident "res" in
-      [L.Local ([ok_var; res_var],
-                [L.call (L.EVar (L.ident "pcall"))
-                   [L.EFun ([], [
-                     L.Return [L.call (L.EVar (L.ident cont_block))
-                                 (List.map cont_args ~f:evar)]
-                   ], false)]]);
-       L.If (L.EVar ok_var,
-             [L.Return [L.EVar res_var]],
-             [],
-             Some [L.Return [L.call (L.EVar (L.ident handler_block))
-                               (L.EVar res_var :: List.map handler_args ~f:evar)]])]
-  | Code.Poptrap _ ->
-      (* After poptrap, we just continue. The pcall already handled the exception. *)
-      []
-
-(* ---- Block compilation ---- *)
-
-let compile_block_def (pc : Code.Addr.t) (block : Code.block) =
-  let body_stmts = List.concat_map block.body ~f:translate_instr in
-  let last_stmts = translate_last block.body block.branch in
-  let all_stmts = body_stmts @ last_stmts in
-  let block_name = Printf.sprintf "_block_%d" (pc :> int) in
-  let params = List.map block.params ~f:ident_of_var in
-  L.Assign ([L.EVar (L.ident block_name)], [L.fun_ params all_stmts])
+  let exit_check = L.If (L.bin L.Eq (L.EVar pc_var) (L.int_ (-1)),
+                          [L.Return [L.int_ 0]], [], None) in
+  let while_loop = L.While (L.bool_ true,
+    exit_check
+    :: (List.rev !var_decls)
+    @ [pc_init]
+    @ while_body)
+  in
+  [while_loop]
 
 (* ---- Program compilation ---- *)
 
 let compile_program (p : Code.program) =
-  (* Collect all blocks reachable from any closure *)
-  let block_order = ref [] in
-  let visited = ref Code.Addr.Set.empty in
-  let rec visit pc =
-    if Code.Addr.Set.mem pc !visited then ()
-    else (
-      visited := Code.Addr.Set.add pc !visited;
-      block_order := pc :: !block_order;
-      let block = Code.Addr.Map.find pc p.blocks in
-      (* Visit blocks reachable from instructions (closures) *)
-      List.iter block.body ~f:(fun instr ->
-          match instr with
-          | Code.Let (_, Code.Closure (_, (pc', _), _)) ->
-              if Code.Addr.Map.mem pc' p.blocks then visit pc'
-          | _ -> ());
-      (* Follow control flow *)
-      match block.branch with
-      | Code.Branch (pc', _) -> visit pc'
-      | Code.Cond (_, (pc1, _), (pc2, _)) -> visit pc1; visit pc2
-      | Code.Switch (_, cases) ->
-          Array.iter cases ~f:(fun (pc', _) -> visit pc')
-      | Code.Pushtrap ((pc_h, _), _, (pc_c, _)) -> visit pc_h; visit pc_c
-      | Code.Poptrap _ -> ()
-      | Code.Return _ | Code.Raise _ | Code.Stop -> ())
-  in
-  visit p.start;
-
-  (* Forward-declare all block functions as nil for mutual recursion *)
-  let forward_decls = List.rev_map !block_order ~f:(fun pc ->
-      let name = Printf.sprintf "_block_%d" (pc :> int) in
-      L.Assign ([L.EVar (L.ident name)], [L.nil]))
-  in
-
-  (* Compile all reachable blocks as function definitions *)
-  let block_defs = List.rev_map !block_order ~f:(fun pc ->
-      let block = Code.Addr.Map.find pc p.blocks in
-      compile_block_def pc block)
-  in
-
-  (* The entry point calls the start block *)
-  let start_block = Printf.sprintf "_block_%d" (p.start :> int) in
-  let entry_call = L.ExprStmt (L.call (L.EVar (L.ident start_block)) []) in
-
-  forward_decls @ block_defs @ [entry_call]
+  current_blocks := p.blocks;
+  [ closure_body p.start ]
+  |> List.concat
