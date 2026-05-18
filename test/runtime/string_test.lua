@@ -8,7 +8,7 @@ local function check(label, ok)
 end
 
 print("=== string length ===")
-check("hello=5", caml_string_length("hello") == 5)
+check("hello=10", caml_string_length("hello") == 10)
 check("empty=0", caml_string_length("") == 0)
 
 print("=== string_concat ===")

@@ -8,11 +8,11 @@
 local math_floor = math.floor
 
 function caml_string_length(s)
-  if s == nil then return 0 end return #s
+  if s == nil then return 0 end return #s * 2
 end
 
 function caml_ml_string_length(s)
-  if s == nil then return 0 end return #s
+  if s == nil then return 0 end return #s * 2
 end
 
 function caml_string_get(s, i)
@@ -28,7 +28,7 @@ function caml_create_bytes(len)
 end
 
 function caml_ml_bytes_length(b)
-  if b == nil then return 0 end return #b
+  if b == nil then return 0 end return #b * 2
 end
 
 function caml_blit_string(s1, ofs1, s2, ofs2, len)
