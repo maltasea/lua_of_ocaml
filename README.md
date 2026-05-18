@@ -1,4 +1,4 @@
-lua_of_ocaml — OCaml to Lua Compiler
+loo - lua_of_ocaml
 ==========================================
 
 Compiles OCaml bytecode programs to Lua 5.1, inspired by js_of_ocaml.
