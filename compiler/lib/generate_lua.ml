@@ -1,12 +1,11 @@
-(** Translate Code.program (jsoo IR) into Lua.program. *)
+(** Translate Code.program (jsoo IR) into Lua.program.
+    Uses structural CFG analysis like js_of_ocaml's generate.ml. *)
 
 open Js_of_ocaml_compiler.Stdlib
 module L = Lua
 module Code = Js_of_ocaml_compiler.Code
 module Targetint = Js_of_ocaml_compiler.Targetint
-
-(* Global ref for blocks map, set by compile_program *)
-let current_blocks : Code.block Code.Addr.Map.t ref = ref Code.Addr.Map.empty
+module Structure = Js_of_ocaml_compiler.Structure
 
 (* ---- Variable naming ---- *)
 
@@ -37,9 +36,43 @@ let block_field e n = L.access e (L.int_ (n + 2))
 let make_block tag fields =
   L.table (L.TArray tag :: List.map fields ~f:(fun f -> L.TArray f))
 
+(* ---- Helpers ---- *)
+
+let get_params (b : Js_of_ocaml_compiler.Code.block) = b.params
+let get_body (b : Js_of_ocaml_compiler.Code.block) = b.body
+let get_branch (b : Js_of_ocaml_compiler.Code.block) = b.branch
+
+let clean_extern name =
+  if String.length name > 0 && Char.equal name.[0] '%'
+  then String.sub name ~pos:1 ~len:(String.length name - 1)
+  else name
+
+let bind_args tgt_params arg_vars =
+  if List.length tgt_params = List.length arg_vars
+  then List.map2 tgt_params arg_vars ~f:(fun p a -> L.Assign ([evar p], [evar a]))
+  else []
+
+(* ---- Scope stack ---- *)
+
+type edge_kind = Loop | Exit_loop | Forward
+
 (* ---- Constant translation ---- *)
 
-let rec translate_constant = function
+let rec translate_expr blocks = function
+  | Code.Apply { f; args; _ } ->
+      L.call (evar f) (List.map ~f:evar args)
+  | Code.Block (tag, fields, _, _) ->
+      make_block (L.int_ tag) (Array.to_list (Array.map ~f:evar fields))
+  | Code.Field (x, n, _) -> block_field (evar x) n
+  | Code.Closure (params, (pc, _), _) ->
+      let params' = List.map params ~f:ident_of_var in
+      L.EFun (params', compile_closure blocks pc, false)
+  | Code.Constant c -> translate_constant c
+  | Code.Prim (p, args) -> translate_prim p args
+  | Code.Special (Code.Alias_prim name) ->
+      L.EVar (L.ident (clean_extern name))
+
+and translate_constant = function
   | Code.String s -> L.string_ s
   | Code.NativeString (Code.Native_string.Byte s) -> L.string_ s
   | Code.NativeString _ -> L.string_ ""
@@ -59,27 +92,6 @@ let rec translate_constant = function
   | Code.Float_array _ -> make_block (L.int_ 253) [L.int_ 0]
   | Code.Int64 _ -> L.int_ 0
 
-(* ---- Expression translation ---- *)
-
-and translate_expr = function
-  | Code.Apply { f; args; _ } ->
-      L.call (evar f) (List.map args ~f:evar)
-  | Code.Block (tag, fields, _, _) ->
-      make_block (L.int_ tag) (Array.to_list (Array.map fields ~f:evar))
-  | Code.Field (x, n, _) -> block_field (evar x) n
-  | Code.Closure (params, (pc, _), _) ->
-      let params' = List.map params ~f:ident_of_var in
-      L.EFun (params', closure_body pc, false)
-  | Code.Constant c -> translate_constant c
-  | Code.Prim (p, args) -> translate_prim p args
-  | Code.Special (Code.Alias_prim name) ->
-      L.EVar (L.ident (clean_extern name))
-
-and clean_extern name =
-  if String.length name > 0 && Char.equal name.[0] '%'
-  then String.sub name ~pos:1 ~len:(String.length name - 1)
-  else name
-
 and translate_prim p args =
   let pa a = match a with Code.Pv v -> evar v | Code.Pc c -> translate_constant c in
   match p, args with
@@ -94,208 +106,279 @@ and translate_prim p args =
   | Code.Le, [a; b] -> L.bin L.Le (pa a) (pa b)
   | Code.Ult, [a; b] -> L.bin L.Lt (pa a) (pa b)
   | Code.Extern name, args ->
-      L.call (L.EVar (L.ident (clean_extern name))) (List.map args ~f:pa)
+      L.call (L.EVar (L.ident (clean_extern name))) (List.map ~f:pa args)
   | _ ->
-      L.call (L.EVar (L.ident "caml_prim_missing")) (List.map args ~f:pa)
+      L.call (L.EVar (L.ident "caml_prim_missing")) (List.map ~f:pa args)
 
-(* ---- Closure body: compile inner CFG as a while-switch trampoline ---- *)
+(* ---- Translate instructions ---- *)
 
-and bind_args tgt_params arg_vars =
-  if List.length tgt_params = List.length arg_vars
-  then List.map2 tgt_params arg_vars ~f:(fun p a -> L.Assign ([evar p], [evar a]))
-  else []
-
-and closure_body entry_pc =
-  let visited = ref Code.Addr.Set.empty in
-  let blocks = ref [] in
-  let rec collect pc =
-    if not (Code.Addr.Set.mem pc !visited) then (
-      visited := Code.Addr.Set.add pc !visited;
-      let b = Code.Addr.Map.find pc !current_blocks in
-      blocks := (pc, b) :: !blocks;
-      List.iter b.body ~f:(fun instr ->
-          match instr with
-          | Code.Let (_, Code.Closure (_, (pc', _), _)) ->
-              if Code.Addr.Map.mem pc' !current_blocks then collect pc'
-          | _ -> ());
-      match b.branch with
-      | Code.Branch (pc', _) -> collect pc'
-      | Code.Cond (_, (pc1, _), (pc2, _)) -> collect pc1; collect pc2
-      | Code.Switch (_, cases) -> Array.iter cases ~f:(fun (pc', _) -> collect pc')
-      | Code.Pushtrap ((pc_h, _), _, (pc_c, _)) -> collect pc_h; collect pc_c
-      | Code.Poptrap _ | Code.Return _ | Code.Raise _ | Code.Stop -> ())
-  in
-  collect entry_pc;
-
-  (* Helper to extract record fields *)
-  let get_params (b : Js_of_ocaml_compiler.Code.block) = b.params in
-  let get_body (b : Js_of_ocaml_compiler.Code.block) = b.body in
-  let get_branch (b : Js_of_ocaml_compiler.Code.block) = b.branch in
-
-  (* Forward-declare all variables *)
-  let var_set = ref Code.Var.Set.empty in
-  let var_decls = ref [] in
-  let declare v =
-    if not (Code.Var.Set.mem v !var_set) then (
-      var_set := Code.Var.Set.add v !var_set;
-      var_decls := L.Assign ([evar v], [L.nil]) :: !var_decls)
-  in
-  List.iter !blocks ~f:(fun (_pc, b) ->
-      let params = get_params b in
-      let body = get_body b in
-      let branch = get_branch b in
-      List.iter params ~f:declare;
-      List.iter body ~f:(fun instr ->
-          match instr with
-          | Code.Let (x, _) -> declare x
-          | _ -> ());
-      (match branch with
-       | Code.Pushtrap (_, x, _) -> declare x
-       | _ -> ()));
-
-  (* Runtime variables *)
-  let pc_var = L.ident "_pc" in
-  let exn_var = L.ident "_exn" in
-  let exn_sp_var = L.ident "_exn_sp" in
-
-  (* Build per-block switch cases *)
-  let switch_cases = List.rev_map !blocks ~f:(fun (pc, b) ->
-      let body = get_body b in
-      let branch = get_branch b in
-      let pc_val = L.int_ (pc :> int) in
-      let instr_stmts = List.concat_map body ~f:(function
-          | Code.Let (x, e) -> [L.Assign ([evar x], [translate_expr e])]
-          | Code.Assign (x, y) -> [L.Assign ([evar x], [evar y])]
-          | Code.Set_field (x, n, _, y) ->
-              [L.Assign ([block_field (evar x) n], [evar y])]
-          | Code.Offset_ref (x, n) ->
-              let f = block_field (evar x) 0 in
-              let rhs = match n with
-                | 0 -> f
-                | 1 -> L.bin L.Add f one
-                | -1 -> L.bin L.Sub f one
-                | n when n < 0 -> L.bin L.Sub f (L.int_ (-n))
-                | _ -> L.bin L.Add f (L.int_ n)
-              in
-              [L.Assign ([block_field (evar x) 0], [rhs])]
-          | Code.Array_set (x, y, z) ->
-              [L.Assign ([L.access (evar x) (L.bin L.Add (evar y) one)], [evar z])]
-          | Code.Event _ -> [])
+and translate_instr blocks = function
+  | Code.Let (x, e) -> [L.Assign ([evar x], [translate_expr blocks e])]
+  | Code.Assign (x, y) -> [L.Assign ([evar x], [evar y])]
+  | Code.Set_field (x, n, _, y) ->
+      [L.Assign ([block_field (evar x) n], [evar y])]
+  | Code.Offset_ref (x, n) ->
+      let f = block_field (evar x) 0 in
+      let rhs = match n with
+        | 0 -> f | 1 -> L.bin L.Add f one | -1 -> L.bin L.Sub f one
+        | n when n < 0 -> L.bin L.Sub f (L.int_ (-n))
+        | _ -> L.bin L.Add f (L.int_ n)
       in
-      let term_stmts = match branch with
-        | Code.Return x -> [L.Return [evar x]]
-        | Code.Stop -> [L.Return []]
+      [L.Assign ([block_field (evar x) 0], [rhs])]
+  | Code.Array_set (x, y, z) ->
+      [L.Assign ([L.access (evar x) (L.bin L.Add (evar y) one)], [evar z])]
+  | Code.Event _ -> []
 
-        | Code.Raise (x, _) ->
-            (* Unwind exception stack, jump to handler *)
-            let f = L.ident "_f" in
-            [ L.If (L.bin L.Gt (L.EVar exn_sp_var) (L.int_ 0),
-                (* Pop frame: read at _exn_sp, then decrement *)
-                [ L.Assign ([L.EVar f], [L.access (L.EVar exn_var) (L.EVar exn_sp_var)])
-                ; L.Assign ([L.EVar exn_sp_var], [L.bin L.Sub (L.EVar exn_sp_var) one])
-                ; L.ExprStmt (L.call (L.EVar (L.ident "caml_set_global"))
-                               [L.access (L.EVar f) one; evar x])
-                ; L.ExprStmt (L.call (L.EVar (L.ident "caml_bind_frame"))
-                               [L.EVar f])
-                ; L.Assign ([L.EVar pc_var], [L.access (L.EVar f) two])
-                ],
-                [],
-                (* No handler *)
-                Some [ L.ExprStmt (L.call (L.EVar (L.ident "caml_raise")) [evar x])
-                     ; L.Assign ([L.EVar pc_var], [L.int_ (-1)])
-                     ])
-            ]
+(* ---- Scope stack for break/continue ---- *)
 
-        | Code.Branch (pc', args) ->
-            let tgt = get_params (Code.Addr.Map.find pc' !current_blocks) in
-            bind_args tgt args
-            @ [L.Assign ([L.EVar pc_var], [L.int_ (pc' :> int)])]
+(* ---- Closure compilation ---- *)
 
-        | Code.Cond (x, (pc1, args1), (pc2, args2)) ->
-            let tgt1 = get_params (Code.Addr.Map.find pc1 !current_blocks) in
-            let tgt2 = get_params (Code.Addr.Map.find pc2 !current_blocks) in
-            let body1 = bind_args tgt1 args1
-                        @ [L.Assign ([L.EVar pc_var], [L.int_ (pc1 :> int)])] in
-            let body2 = bind_args tgt2 args2
-                        @ [L.Assign ([L.EVar pc_var], [L.int_ (pc2 :> int)])] in
-            [L.If (evar x, body1, [], Some body2)]
+and compile_closure blocks entry_pc =
+  let structure = Structure.build_graph blocks entry_pc in
+  let dom = Structure.dominator_tree structure in
+  let visited_blocks = ref Code.Addr.Set.empty in
 
-        | Code.Switch (x, cases) ->
-            let n = Array.length cases in
-            let rec build_cases i =
-              if i >= n then []
-              else
-                let (pc', args') = cases.(i) in
-                let tgt = get_params (Code.Addr.Map.find pc' !current_blocks) in
-                let body = bind_args tgt args'
-                           @ [L.Assign ([L.EVar pc_var], [L.int_ (pc' :> int)])] in
-                L.If (L.bin L.Eq (evar x) (L.int_ i), body, [], None)
-                :: build_cases (i + 1)
-            in
-            build_cases 0
-
-        | Code.Pushtrap ((pc_h, args_h), x, (pc_c, args_c)) ->
-            (* Push handler frame: {x_name, handler_pc, param_names, arg_values}
-               x_name is the Lua variable name to store the caught exception into *)
-            let h_params = get_params (Code.Addr.Map.find pc_h !current_blocks) in
-            let frame = L.table
-                [ L.TArray (L.string_ (var_str x))
-                ; L.TArray (L.int_ (pc_h :> int))
-                ; L.TArray (L.table (List.map h_params
-                                        ~f:(fun p -> L.TArray (L.string_ (var_str p)))))
-                ; L.TArray (L.table (List.map args_h ~f:(fun v -> L.TArray (evar v))))
-                ]
-            in
-            let push_exn = L.Assign ([L.EVar exn_sp_var],
-                                      [L.bin L.Add (L.EVar exn_sp_var) one]) in
-            let store_frame = L.Assign
-                ([L.access (L.EVar exn_var) (L.EVar exn_sp_var)], [frame]) in
-            let tgt_c = get_params (Code.Addr.Map.find pc_c !current_blocks) in
-            L.Assign ([evar x], [make_block (L.int_ 0) []])
-            :: push_exn
-            :: store_frame
-            :: bind_args tgt_c args_c
-            @ [L.Assign ([L.EVar pc_var], [L.int_ (pc_c :> int)])]
-
-        | Code.Poptrap (pc_after, args) ->
-            (* Pop exception stack *)
-            let pop_exn = L.Assign ([L.EVar exn_sp_var],
-                                     [L.bin L.Sub (L.EVar exn_sp_var) one]) in
-            let tgt = get_params (Code.Addr.Map.find pc_after !current_blocks) in
-            pop_exn
-            :: bind_args tgt args
-            @ [L.Assign ([L.EVar pc_var], [L.int_ (pc_after :> int)])]
+  (* Collect predecessor counts to identify merge nodes *)
+  let pred_counts = ref Code.Addr.Map.empty in
+  let incr_pred pc =
+    pred_counts := Code.Addr.Map.update pc (fun n ->
+        Some (Option.value ~default:0 n + 1)) !pred_counts
+  in
+  let _ = Code.Addr.Map.fold (fun _pc block () ->
+      let add_target = function
+        | pc' -> incr_pred pc'
       in
-      (pc_val, instr_stmts @ term_stmts))
+      (match get_branch block with
+       | Code.Branch (pc', _) -> add_target pc'
+       | Code.Cond (_, (pc1, _), (pc2, _)) -> add_target pc1; add_target pc2
+       | Code.Switch (_, cases) -> Array.iter ~f:(fun (pc', _) -> add_target pc') cases
+       | Code.Pushtrap ((pc_h, _), _, (pc_c, _)) -> add_target pc_h; add_target pc_c
+       | Code.Poptrap (pc, _) -> add_target pc
+       | Code.Return _ | Code.Raise _ | Code.Stop -> ());
+       ()) blocks () in
+
+  (* For each block with >1 predecessor, compile as a local function *)
+  let merge_blocks = ref Code.Addr.Set.empty in
+  let _ = Code.Addr.Map.fold (fun pc n () ->
+      if n > 1 then merge_blocks := Code.Addr.Set.add pc !merge_blocks;
+      ()) !pred_counts () in
+
+  let merge_name pc = Printf.sprintf "_m%d" (pc :> int) in
+
+  let merge_decls = ref [] in
+  let merge_defs = ref [] in
+  let merge_compiled = ref Code.Addr.Set.empty in
+
+  let compile_merge pc =
+    if Code.Addr.Set.mem pc !merge_blocks
+       && not (Code.Addr.Set.mem pc !merge_compiled)
+    then (
+      merge_compiled := Code.Addr.Set.add pc !merge_compiled;
+      let block = Code.Addr.Map.find pc blocks in
+      let body =
+        List.concat_map ~f:(translate_instr blocks) (get_body block)
+        @ compile_conditional ~fall_through:None structure dom visited_blocks
+            blocks merge_blocks (Some pc) [] (get_branch block)
+      in
+      merge_decls := L.Local ([L.ident (merge_name pc)], []) :: !merge_decls;
+      merge_defs := L.Assign ([L.EVar (L.ident (merge_name pc))],
+                               [L.fun_ (List.map ~f:ident_of_var (get_params block)) body])
+                    :: !merge_defs)
   in
 
-  let while_body =
-    List.concat_map switch_cases ~f:(fun (pc_val, stmts) ->
-        [L.If (L.bin L.Eq (L.EVar pc_var) pc_val, stmts, [], None)])
+  (* Compile merge blocks first (they're called from branch targets) *)
+  let _ = Code.Addr.Set.fold (fun pc () -> compile_merge pc; ()) !merge_blocks () in
+
+  (* Compile the main body starting from entry_pc *)
+  let body = compile_branch ~fall_through:None structure dom visited_blocks
+               blocks merge_blocks None (entry_pc, []) [] in
+
+  List.rev !merge_decls @ List.rev !merge_defs @ body
+
+(* ---- Branch: jump to a block ---- *)
+
+and compile_branch ~fall_through structure dom visited_blocks
+    blocks merge_blocks parent_block (pc, args) scope_stack =
+
+  (* Check fall-through *)
+  let is_fall_through = match fall_through with
+    | Some ft -> ft = pc
+    | None -> false
   in
 
-  let f_tmp = L.ident "_f" in
-  let exn_init =
-    [ L.Assign ([L.EVar exn_var], [L.table []])
-    ; L.Assign ([L.EVar exn_sp_var], [L.int_ 0])
-    ; L.Assign ([L.EVar f_tmp], [L.nil])
-    ]
+  if is_fall_through then
+    (* Sequential code, no jump needed *)
+    bind_args (Code.Addr.Map.find pc blocks).params args
+  else
+    (* Check scope stack for break/continue *)
+    let scope = List.find_map scope_stack ~f:(fun (pc', kind) ->
+        if pc = pc' then Some kind else None)
+    in
+    match scope with
+    | Some Loop ->
+        (* Back-edge to loop header, just bind args and continue loop *)
+        bind_args (Code.Addr.Map.find pc blocks).params args
+    | Some Exit_loop ->
+        (* Exit loop: break *)
+        bind_args (Code.Addr.Map.find pc blocks).params args
+        @ [L.Break]
+    | Some Forward ->
+        (* Forward edge already compiled, just bind args *)
+        bind_args (Code.Addr.Map.find pc blocks).params args
+        @ [L.Break]
+    | None when Code.Addr.Set.mem pc !merge_blocks ->
+        (* Merge node with multiple predecessors: call the precompiled function *)
+        let args' = List.map ~f:evar args in
+        [L.Return [L.call (L.EVar (L.ident (Printf.sprintf "_m%d" (pc :> int)))) args']]
+    | None ->
+        (* Block not in scope, compile it inline *)
+        compile_block ~fall_through structure dom visited_blocks
+          blocks merge_blocks parent_block pc scope_stack
+
+(* ---- Block: loop detection ---- *)
+
+and compile_block ~fall_through structure dom visited_blocks
+    blocks merge_blocks parent_block pc scope_stack =
+
+  if Code.Addr.Set.mem pc !visited_blocks then []
+  else if (try Structure.is_loop_header structure pc with Not_found -> false) then (
+    (* Loop detected! *)
+    visited_blocks := Code.Addr.Set.add pc !visited_blocks;
+    let block = Code.Addr.Map.find pc blocks in
+    let scope_stack = (pc, Loop) :: scope_stack in
+    let body =
+      List.concat_map ~f:(translate_instr blocks) (get_body block)
+      @ compile_conditional ~fall_through:(Some pc) structure dom visited_blocks
+          blocks merge_blocks (Some pc) scope_stack (get_branch block)
+    in
+    [L.While (L.bool_ true, body)]
+  ) else
+    compile_block_no_loop ~fall_through structure dom visited_blocks
+      blocks merge_blocks parent_block pc scope_stack
+
+(* ---- Block no loop ---- *)
+
+and compile_block_no_loop ~fall_through structure dom visited_blocks
+    blocks merge_blocks _parent_block pc scope_stack =
+
+  if Code.Addr.Set.mem pc !visited_blocks then []
+  else (
+    visited_blocks := Code.Addr.Set.add pc !visited_blocks;
+    let block = Code.Addr.Map.find pc blocks in
+
+    let instr_stmts = List.concat_map ~f:(translate_instr blocks) (get_body block) in
+
+    let branch_stmts = compile_conditional ~fall_through structure dom visited_blocks
+        blocks merge_blocks (Some pc) scope_stack (get_branch block)
+    in
+
+    (* Detect forward edges: targets with >1 predecessor in this scope *)
+    let successors = match get_branch block with
+      | Code.Branch (pc', _) -> [pc']
+      | Code.Cond (_, (pc1, _), (pc2, _)) -> [pc1; pc2]
+      | Code.Switch (_, cases) -> Array.to_list (Array.map ~f:fst cases)
+      | Code.Pushtrap ((pc_h, _), _, (pc_c, _)) -> [pc_h; pc_c]
+      | Code.Poptrap (pc', _) -> [pc']
+      | Code.Return _ | Code.Raise _ | Code.Stop -> []
+    in
+
+    (* Find successors that are forward targets (in scope or merge) *)
+    let forward_targets = List.filter successors ~f:(fun pc' ->
+        not (Code.Addr.Set.mem pc' !visited_blocks)
+        && (List.exists scope_stack ~f:(fun (pc'', _) -> pc'' = pc')
+           || Code.Addr.Set.mem pc' !merge_blocks))
+    in
+
+    let forward_code = List.concat_map forward_targets ~f:(fun pc' ->
+        compile_block ~fall_through:(Some pc') structure dom visited_blocks
+          blocks merge_blocks (Some pc') pc' scope_stack)
+    in
+
+    instr_stmts @ branch_stmts @ forward_code
+  )
+
+(* ---- Conditional: handle the last instruction of a block ---- *)
+
+and compile_conditional ~fall_through structure dom visited_blocks
+    blocks merge_blocks parent_block _scope_stack last =
+
+  let branch ~fall_through pc args scope_stack =
+    compile_branch ~fall_through structure dom visited_blocks
+      blocks merge_blocks parent_block (pc, args) scope_stack
   in
-  let pc_init = L.Assign ([L.EVar pc_var], [L.int_ (entry_pc :> int)]) in
-  let exit_check = L.If (L.bin L.Eq (L.EVar pc_var) (L.int_ (-1)),
-                          [L.Return [L.int_ 0]], [], None) in
-  let while_loop = L.While (L.bool_ true,
-    exit_check
-    :: (List.rev !var_decls)
-    @ exn_init
-    @ [pc_init]
-    @ while_body)
-  in
-  [while_loop]
+
+  match last with
+  | Code.Return x -> [L.Return [evar x]]
+  | Code.Raise (x, _) ->
+      [L.ExprStmt (L.call (L.EVar (L.ident "error")) [evar x])]
+  | Code.Stop -> [L.Return []]
+  | Code.Branch (pc', args) ->
+      branch ~fall_through pc' args []
+
+  | Code.Cond (x, (pc1, args1), (pc2, args2)) ->
+      let body1 = branch ~fall_through pc1 args1 [] in
+      let body2 = branch ~fall_through pc2 args2 [] in
+      [L.If (evar x, body1, [], Some body2)]
+
+  | Code.Switch (x, cases) ->
+      let n = Array.length cases in
+      let rec build i =
+        if i >= n then []
+        else
+          let (pc', args') = cases.(i) in
+          let body = branch ~fall_through pc' args' [] in
+          let cond = L.bin L.Eq (evar x) (L.int_ i) in
+          L.If (cond, body, [], None) :: build (i + 1)
+      in
+      build 0
+
+  | Code.Pushtrap ((pc_h, args_h), x, (pc_c, args_c)) ->
+      (* pcall-based try-catch *)
+      let body_c = branch ~fall_through pc_c args_c [] in
+      let body_h = branch ~fall_through pc_h (x :: args_h) [] in
+      let ok_var = L.ident "_ok" in
+      let res_var = L.ident "_res" in
+      [ L.Local ([ok_var; res_var],
+                 [L.call (L.EVar (L.ident "pcall"))
+                    [L.EFun ([], body_c, false)]])
+      ; L.If (L.EVar ok_var,
+              [L.Assign ([evar x], [L.EVar res_var])],
+              [],
+              Some (L.Assign ([evar x], [L.EVar res_var]) :: body_h))
+      ]
+
+  | Code.Poptrap _ ->
+      (* After try/catch, x holds the result. Poptrap is implicit in JS/Lua.
+         The corresponding Pushtrap already emitted the try/catch.
+         We just continue to the next block (called by our caller). *)
+      []
 
 (* ---- Program compilation ---- *)
 
 let compile_program (p : Code.program) =
-  current_blocks := p.blocks;
-  [ closure_body p.start ]
-  |> List.concat
+  (* Collect all vars from all blocks, declare as local at top *)
+  let var_set = ref Code.Var.Set.empty in
+  let var_decls = ref [] in
+  let _ = Code.Addr.Map.fold (fun _pc block () ->
+      List.iter ~f:(fun v ->
+          if not (Code.Var.Set.mem v !var_set) then (
+            var_set := Code.Var.Set.add v !var_set;
+            var_decls := L.Assign ([evar v], [L.nil]) :: !var_decls))
+        (get_params block);
+      List.iter ~f:(fun instr ->
+          match instr with
+          | Code.Let (x, _) when not (Code.Var.Set.mem x !var_set) ->
+              var_set := Code.Var.Set.add x !var_set;
+              var_decls := L.Assign ([evar x], [L.nil]) :: !var_decls
+          | _ -> ())
+        (get_body block);
+      ()) p.blocks ()
+  in
+
+  let body = compile_closure p.blocks p.start in
+  let params = (Code.Addr.Map.find p.start p.blocks).params in
+  let fn_params = List.map params ~f:ident_of_var in
+  [ L.FunAssign (L.EVar (L.ident "_main"), fn_params,
+                  List.rev !var_decls @ body)
+  ; L.ExprStmt (L.call (L.EVar (L.ident "_main")) [])
+  ]
