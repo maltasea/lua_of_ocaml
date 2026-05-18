@@ -37,6 +37,15 @@ function caml_sys_open(_path, _flags, _perm) return 0 end
 function caml_input_value(_chan) return 0 end
 function caml_output_value(_chan, _v) return 0 end
 
+-- Aliases for primitives that call without _field suffix
+caml_atomic_load = caml_atomic_load_field
+caml_atomic_cas = caml_atomic_cas_field
+
+-- Aliases for %int_* inline primitives stripped by code generator
+int_mul = caml_mul
+int_div = caml_div
+int_mod = caml_mod
+
 function caml_atomic_load_field(obj, field_idx)
   local pos = math_floor(field_idx / 2) + 2
   return obj[pos] or 0

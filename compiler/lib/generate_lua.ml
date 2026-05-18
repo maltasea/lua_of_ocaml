@@ -381,5 +381,4 @@ let compile_program (p : Code.program) =
   in
   [ L.FunAssign (L.EVar (L.ident "_main"), fn_params,
                   src_comment @ List.rev !var_decls @ body)
-  ; L.ExprStmt (L.call (L.EVar (L.ident "_main")) [])
   ]

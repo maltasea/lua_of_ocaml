@@ -28,8 +28,9 @@ let load_runtime () =
         close_in ic;
         Buffer.add_string buf content;
         Buffer.add_char buf '\n')
-      else
-        Printf.eprintf "WARNING: runtime file not found: %s\n" path);
+      else (
+        Printf.eprintf "ERROR: runtime file not found: %s\n" path;
+        exit 1));
   Buffer.contents buf
 
 let write_output ~runtime:_ ~source_file oc lua_prog =

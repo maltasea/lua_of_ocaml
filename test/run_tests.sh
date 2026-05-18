@@ -195,9 +195,61 @@ else
 fi
 
 # ======================================================================
+echo "=== Runtime smoke tests (run generated Lua) ==="
+
+# -- test 11: hello.ml runs without crash --
+say "hello.ml runs"
+compile_ocaml test/hello.ml test/_hello_runs.byte
+run_compiler test/_hello_runs.byte test/_hello_runs.lua 2>/dev/null
+if check_lua_runs test/_hello_runs.lua 2>/dev/null; then
+  ok
+else
+  fail "crashed at runtime"
+fi
+
+# -- test 12: arithmetic runs --
+say "arithmetic runs"
+compile_ocaml test/_arith.ml test/_arith_runs.byte 2>/dev/null
+run_compiler test/_arith_runs.byte test/_arith_runs.lua 2>/dev/null
+if check_lua_runs test/_arith_runs.lua 2>/dev/null; then
+  ok
+else
+  fail "crashed at runtime"
+fi
+
+# -- test 13: minimal.ml runs without missing primitives --
+say "minimal.ml runs (no missing prims)"
+compile_ocaml test/minimal.ml test/_minimal_runs.byte 2>/dev/null
+run_compiler test/_minimal_runs.byte test/_minimal_runs.lua 2>/dev/null
+if check_lua_runs test/_minimal_runs.lua 2>/dev/null; then
+  ok
+else
+  fail "crashed (check for missing primitives)"
+fi
+
+# -- test 14: functions run --
+say "functions run"
+compile_ocaml test/_fun.ml test/_fun_runs.byte 2>/dev/null
+run_compiler test/_fun_runs.byte test/_fun_runs.lua 2>/dev/null
+if check_lua_runs test/_fun_runs.lua 2>/dev/null; then
+  ok
+else
+  fail "crashed at runtime"
+fi
+
+# -- test 15: single _main() call --
+say "single _main() call"
+count=$(grep -c "^_main()" test/_hello.lua 2>/dev/null || echo 0)
+if [ "$count" -eq 1 ]; then
+  ok
+else
+  fail "found $count _main() calls (expected 1)"
+fi
+
+# ======================================================================
 echo "=== Source tracing tests ==="
 
-# -- test 11: source comments present --
+# -- test 16: source comments present --
 say "source comments in output"
 if check_contains test/_hello.lua "hello.ml:"; then
   ok

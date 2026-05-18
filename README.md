@@ -67,7 +67,7 @@ Architecture
                 Lua AST
                   lua_output.ml
                     .lua text
-                      + runtime_lua.ml  (embedded Lua primitives)
+                      + runtime/lua/*.lua  (Lua primitives)
                         lua hello.lua
 
 The IR (Code.program) from js_of_ocaml is target-agnostic. lua_of_ocaml
@@ -80,8 +80,8 @@ Files
     compiler/lib/lua.ml            Lua 5.1 AST
     compiler/lib/lua_output.ml     Lua pretty printer
     compiler/lib/generate_lua.ml   Code generator (IR -> Lua)
-    compiler/lib/runtime_lua.ml    OCaml runtime in Lua (embedded)
     compiler/bin-lua_of_ocaml/     CLI entry point
+    runtime/lua/*.lua              Lua runtime (split files)
     test/hello.ml                  Example OCaml program
 
 License
