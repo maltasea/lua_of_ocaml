@@ -73,7 +73,7 @@ let rec translate_expr blocks = function
               | Some f -> Filename.basename f
               | None -> "?"
             in
-            L.Comment (Printf.sprintf "%s:%d" file pi.line) :: body
+            L.Comment (Printf.sprintf "# %s:%d" file pi.line) :: body
         | None -> body
       in
       L.EFun (params', body, false)
@@ -142,7 +142,7 @@ and translate_instr blocks = function
         | Some f -> Filename.basename f
         | None -> "?"
       in
-      [L.Comment (Printf.sprintf "%s:%d" file pi.line)]
+      [L.Comment (Printf.sprintf "# %s:%d" file pi.line)]
 
 (* ---- Scope stack for break/continue ---- *)
 
@@ -376,8 +376,8 @@ let compile_program (p : Code.program) =
   let src_comment = match get_body start_block with
     | Code.Event pi :: _ ->
         let file = match pi.src with Some f -> Filename.basename f | None -> "?" in
-        [L.Comment (Printf.sprintf "src: %s:%d" file pi.line)]
-    | _ -> [L.Comment "src: <unknown>"]
+        [L.Comment (Printf.sprintf "# %s:%d" file pi.line)]
+    | _ -> [L.Comment "# <unknown>"]
   in
   [ L.FunAssign (L.EVar (L.ident "_main"), fn_params,
                   src_comment @ List.rev !var_decls @ body)

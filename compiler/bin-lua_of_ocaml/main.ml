@@ -35,7 +35,7 @@ let load_runtime () =
 let write_output ~runtime:_ ~source_file oc lua_prog =
   let fmt = Js_of_ocaml_compiler.Pretty_print.to_out_channel oc in
   Js_of_ocaml_compiler.Pretty_print.string fmt
-    (Printf.sprintf "-- source: %s\n" source_file);
+    (Printf.sprintf "--# source: %s\n" source_file);
   Js_of_ocaml_compiler.Pretty_print.string fmt (load_runtime ());
   Lua_output.program fmt lua_prog;
   Js_of_ocaml_compiler.Pretty_print.string fmt "_main()\n"
@@ -45,7 +45,7 @@ let run input_file output_file =
   (match Parse_bytecode.from_channel ic with
    | `Exe ->
        let parsed = Parse_bytecode.from_exe ~linkall:false ~link_info:false
-           ~include_cmis:false ic in
+           ~include_cmis:false ~debug:true ic in
        close_in ic;
        let lua_prog = Generate_lua.compile_program parsed.code in
        let oc = match output_file with
