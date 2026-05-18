@@ -1,4 +1,5 @@
 *.byte
+report.txt
 *.cmi
 *.cmo
 _build/
