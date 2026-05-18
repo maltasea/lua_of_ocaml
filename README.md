@@ -50,7 +50,7 @@ The compiler is at `_build/default/compiler/bin-lua_of_ocaml/main.exe`.
 Tests
 -----
 
-    bash test/run_tests.sh
+    bash test/run_all.sh
 
 Runs 26 tests: compiler smoke tests (10 OCaml programs → valid Lua),
 source tracing, and Lua runtime unit tests. Requires `ocamlc` and `lua`.

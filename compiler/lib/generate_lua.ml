@@ -105,8 +105,10 @@ and translate_constant = function
 and translate_prim p args =
   let pa a = match a with Code.Pv v -> evar v | Code.Pc c -> translate_constant c in
   match p, args with
-  | Code.Vectlength, [a] -> L.bin L.Sub (L.EUn (L.Len, pa a)) one
-  | Code.Array_get, [a; b] -> L.access (pa a) (L.bin L.Add (pa b) one)
+  | Code.Vectlength, [a] ->
+      L.bin L.Mul (L.bin L.Sub (L.EUn (L.Len, pa a)) one) two
+  | Code.Array_get, [a; b] ->
+      L.access (pa a) (L.bin L.Add (L.bin L.Div (pa b) two) two)
   | Code.Not, [a] -> L.EUn (L.Not, pa a)
   | Code.IsInt, [a] ->
       L.bin L.Eq (L.call (L.EVar (L.ident "type")) [pa a]) (L.string_ "number")
@@ -349,7 +351,9 @@ and compile_conditional ~fall_through structure dom visited_blocks
 (* ---- Program compilation ---- *)
 
 let compile_program (p : Code.program) =
-  (* Collect all vars from all blocks, declare as local at top *)
+  (* Collect all vars from all blocks, assign as globals.
+     Using L.Local here would exceed Lua 5.1's 200-local limit for many
+     programs.  Globals avoid that limit at the cost of scoping leakage. *)
   let var_set = ref Code.Var.Set.empty in
   let var_decls = ref [] in
   let _ = Code.Addr.Map.fold (fun _pc block () ->

@@ -37,26 +37,22 @@ function caml_sys_open(_path, _flags, _perm) return 0 end
 function caml_input_value(_chan) return 0 end
 function caml_output_value(_chan, _v) return 0 end
 
--- Aliases for primitives that call without _field suffix
-caml_atomic_load = caml_atomic_load_field
-caml_atomic_cas = caml_atomic_cas_field
-
 -- Aliases for %int_* inline primitives stripped by code generator
 int_mul = caml_mul
 int_div = caml_div
 int_mod = caml_mod
 
 -- FFI demo: user-defined Lua function callable from OCaml via Extern
-function lu_add(a, b)
+function lua_add(a, b)
   -- a,b are tagged OCaml ints (value * 2)
   return a + b  -- tagged addition stays tagged
 end
 
-function lu_greet(name)
-  -- name is an OCaml string (= Lua string)
+function lua_greet(name)
   io.write("hello from Lua: " .. name .. "\n")
   return name
 end
+os_date = os.date
 
 function caml_atomic_load_field(obj, field_idx)
   local pos = math_floor(field_idx / 2) + 2
@@ -81,3 +77,6 @@ end
 function caml_atomic_set_field(obj, field_idx, val)
   local pos = math_floor(field_idx / 2) + 2; obj[pos] = val; return 0
 end
+
+caml_atomic_load = caml_atomic_load_field
+caml_atomic_cas = caml_atomic_cas_field

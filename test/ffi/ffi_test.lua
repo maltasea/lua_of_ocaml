@@ -13,8 +13,8 @@ local function check(label, ok)
   else print("  FAIL: " .. label) end
 end
 
-check("lu_add(4,6)", lu_add(4,6) == 10)
-check("lu_add(10,20)", lu_add(10,20) == 30)
+check("lua_add(4,6)", lua_add(4,6) == 10)
+check("lua_add(10,20)", lua_add(10,20) == 30)
 check("caml_mul(6,8)", caml_mul(6,8) == 24)
 check("int_add(2,6)", int_add(2,6) == 8)
 check("int_and(10,12)", int_and(10,12) == 8)
