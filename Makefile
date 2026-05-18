@@ -4,17 +4,17 @@ build:
 	dune build
 
 test:
-	bash test/run_tests.sh
+	bash test/run_all.sh
 
 clean:
 	dune clean
+	rm -rf test/_out
 	find . -name '*.byte' -o -name '*.cmi' -o -name '*.cmo' -o -name '*.cma' | xargs rm -f
-	rm -f test/_*.ml test/_*.lua test/_*.byte
 
 hello: build
-	ocamlc -g -o test/hello.byte test/hello.ml
-	dune exec -- compiler/bin-lua_of_ocaml/main.exe -- test/hello.byte -o test/hello.lua
-	lua test/hello.lua
+	ocamlc -g -o test/_hello.byte test/smoke/hello.ml
+	dune exec -- compiler/bin-lua_of_ocaml/main.exe -- test/_hello.byte -o test/_hello.lua
+	lua test/_hello.lua
 
 run: build
 	dune exec -- compiler/bin-lua_of_ocaml/main.exe -- $(FILE)

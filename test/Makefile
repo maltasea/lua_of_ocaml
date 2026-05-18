@@ -1,12 +1,10 @@
-.PHONY: test clean test-all
+.PHONY: test clean
 
 test:
-	bash run_tests.sh
-
-test-all:
 	bash run_all.sh
 
 clean:
+	rm -rf _out
 	rm -f *.byte *.lua *.cmi *.cmo *.cma
 	cd compiler && $(MAKE) clean
 	cd runtime && $(MAKE) clean

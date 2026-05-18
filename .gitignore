@@ -1,7 +1,7 @@
 *.byte
-*.lua
 *.cmi
 *.cmo
 _build/
+test/_out/
 *.swp
 *~
