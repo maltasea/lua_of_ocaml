@@ -1,4 +1,4 @@
-lua_of_ocaml — OCaml to Lua 5.1 Compiler
+lua_of_ocaml — OCaml to Lua Compiler
 ==========================================
 
 Compiles OCaml bytecode programs to Lua 5.1, inspired by js_of_ocaml.
@@ -6,46 +6,38 @@ Compiles OCaml bytecode programs to Lua 5.1, inspired by js_of_ocaml.
 > **Note:** this project was written in a heavily guided, multi-hour
 > chat session with Claude Code (Claude Opus 4.7) — nothing agentic.
 
-## Source tracing (MVP)
-
-Generated Lua includes `-- file:line` comments at closure boundaries and
-block entry points, mapping back to the original OCaml source. Compile
-your OCaml with `-g` to include debug info:
-
-    ocamlc -g -o hello.byte hello.ml
 First steps
 -----------
 
 ### 1. Install
 
-You need OCaml, dune, Lua 5.1, and the js_of_ocaml compiler library:
-
     opam install js_of_ocaml-compiler
-
-Clone and build:
-
     git clone git@github.com:maltasea/lua_of_ocaml.git
     cd lua_of_ocaml
     dune build
 
-The compiler is at `_build/default/compiler/bin-lua_of_ocaml/main.exe`.
+### 2. Run hello world
 
-### 2. Write an OCaml program
+    echo 'let () = print_endline "hello from lua"' > hello.ml
+    make hello
 
-    (* hello.ml *)
-    let () = print_endline "hello from lua"
+Output:
 
-### 3. Compile to bytecode
+    hello from lua
 
-    ocamlc -o hello.byte hello.ml
+### 3. Write your own
 
-### 4. Run lua_of_ocaml
+Edit `hello.ml`, then `make hello`.  The Makefile target compiles to
+bytecode, runs lua_of_ocaml, deletes intermediate `.byte`/`.cmi`/`.cmo`,
+and runs the generated `hello.lua`.
 
-    dune exec -- compiler/bin-lua_of_ocaml/main.exe -- hello.byte -o hello.lua
+## Source tracing
 
-### 5. Run with Lua
+Generated Lua includes `-- file:line` comments at closure boundaries and
+block entry points mapping back to the original OCaml source.  Compile
+with `-g` to include debug info:
 
-    lua hello.lua
+    ocamlc -g -o hello.byte hello.ml
 
 Tests
 -----
