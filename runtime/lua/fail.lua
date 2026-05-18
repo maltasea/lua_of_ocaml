@@ -4,5 +4,6 @@
 function caml_failwith(msg) error(msg) end
 function caml_invalid_argument(msg) error("Invalid_argument: " .. msg) end
 function caml_raise(exn)
+  -- TODO: propagate via pcall; for now return sentinel
   return 0
 end

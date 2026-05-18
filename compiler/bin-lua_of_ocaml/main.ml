@@ -55,7 +55,7 @@ let run input_file output_file =
        write_output ~runtime:true ~source_file:input_file oc lua_prog;
        if Option.is_some output_file then close_out oc
    | `Cmo (compunit) ->
-       let parsed = Parse_bytecode.from_cmo compunit ic in
+       let parsed = Parse_bytecode.from_cmo ~debug:true compunit ic in
        close_in ic;
        let lua_prog = Generate_lua.compile_program parsed.Parse_bytecode.code in
        let oc = match output_file with
@@ -65,7 +65,7 @@ let run input_file output_file =
        write_output ~runtime:true ~source_file:input_file oc lua_prog;
        if Option.is_some output_file then close_out oc
    | `Cma lib ->
-       let parsed = Parse_bytecode.from_cma lib ic in
+       let parsed = Parse_bytecode.from_cma ~debug:true lib ic in
        close_in ic;
        let lua_prog = Generate_lua.compile_program parsed.Parse_bytecode.code in
        let oc = match output_file with

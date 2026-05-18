@@ -303,7 +303,7 @@ and compile_conditional ~fall_through structure dom visited_blocks
   match last with
   | Code.Return x -> [L.Return [evar x]]
   | Code.Raise (x, _) ->
-      [L.ExprStmt (L.call (L.EVar (L.ident "error")) [evar x])]
+      [L.ExprStmt (L.call (L.EVar (L.ident "caml_raise")) [evar x])]
   | Code.Stop -> [L.Return []]
   | Code.Branch (pc', args) ->
       branch ~fall_through pc' args []
