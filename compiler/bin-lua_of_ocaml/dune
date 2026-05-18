@@ -1,0 +1,3 @@
+(executable
+ (name main)
+ (libraries lua_of_ocaml_compiler))

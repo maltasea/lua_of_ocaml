@@ -1,0 +1,5 @@
+(library
+ (name lua_of_ocaml_compiler)
+ (synopsis "Lua_of_ocaml compiler library")
+ (libraries js_of_ocaml-compiler)
+ (flags (:standard -w -33)))

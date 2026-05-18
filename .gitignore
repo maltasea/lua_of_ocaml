@@ -1,0 +1,42 @@
+# Build artifacts
+**/_build/
+**/_opam/
+**/.merlin
+
+# Compiled files
+**/*.cmo
+**/*.cmi
+**/*.cmx
+**/*.cma
+**/*.cmxa
+**/*.cmxs
+**/*.cmt
+**/*.cmti
+**/*.o
+**/*.a
+**/*.so
+**/*.annot
+
+# Dune
+**/.dune/
+**/dune-project.lock
+
+# OPAM
+**/*.install
+**/_opam/
+
+# Executables (uncomment if you don't want to track them)
+# **/*.exe
+# **/*.native
+# **/*.byte
+
+# Editor / OS
+**/.vscode/
+**/.idea/
+**/*.swp
+**/.DS_Store
+
+# Coverage / docs
+**/_coverage/
+**/bisect*.coverage
+**/_doc/
