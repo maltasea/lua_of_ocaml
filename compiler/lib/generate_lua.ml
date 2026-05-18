@@ -272,29 +272,7 @@ and compile_block_no_loop ~fall_through structure dom visited_blocks
         blocks merge_blocks (Some pc) scope_stack (get_branch block)
     in
 
-    (* Detect forward edges: targets with >1 predecessor in this scope *)
-    let successors = match get_branch block with
-      | Code.Branch (pc', _) -> [pc']
-      | Code.Cond (_, (pc1, _), (pc2, _)) -> [pc1; pc2]
-      | Code.Switch (_, cases) -> Array.to_list (Array.map ~f:fst cases)
-      | Code.Pushtrap ((pc_h, _), _, (pc_c, _)) -> [pc_h; pc_c]
-      | Code.Poptrap (pc', _) -> [pc']
-      | Code.Return _ | Code.Raise _ | Code.Stop -> []
-    in
-
-    (* Find successors that are forward targets (in scope or merge) *)
-    let forward_targets = List.filter successors ~f:(fun pc' ->
-        not (Code.Addr.Set.mem pc' !visited_blocks)
-        && (List.exists scope_stack ~f:(fun (pc'', _) -> pc'' = pc')
-           || Code.Addr.Set.mem pc' !merge_blocks))
-    in
-
-    let forward_code = List.concat_map forward_targets ~f:(fun pc' ->
-        compile_block ~fall_through:(Some pc') structure dom visited_blocks
-          blocks merge_blocks (Some pc') pc' scope_stack)
-    in
-
-    instr_stmts @ branch_stmts @ forward_code
+    instr_stmts @ branch_stmts
   )
 
 (* ---- Conditional: handle the last instruction of a block ---- *)

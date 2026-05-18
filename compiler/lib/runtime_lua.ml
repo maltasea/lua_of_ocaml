@@ -385,8 +385,6 @@ end
 
 let postamble = {|
 -- Entry point
-io.stderr:write("=== START ===\n")
-local ok, err = pcall(_block_0)
+local ok, err = pcall(_main)
 if not ok then io.stderr:write("ERROR: " .. tostring(err) .. "\n") end
-io.stderr:write("=== DONE ===\n")
 |}

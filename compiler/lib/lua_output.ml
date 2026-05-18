@@ -230,34 +230,39 @@ and statement f st =
   | L.If (cond, then_body, elseif_clauses, else_body) ->
       PP.string f "if ";
       expression f cond;
-      PP.string f " then ";
+      PP.string f " then";
+      PP.newline f;
       statement_list f then_body;
       (match elseif_clauses with
        | [] -> ()
        | _ ->
            List.iter elseif_clauses ~f:(fun (c, b) ->
-               PP.string f " elseif ";
+               PP.string f "elseif ";
                expression f c;
-               PP.string f " then ";
+               PP.string f " then";
+               PP.newline f;
                statement_list f b));
       (match else_body with
        | None -> ()
        | Some b ->
-           PP.string f " else ";
+           PP.string f "else";
+           PP.newline f;
            statement_list f b);
-      PP.string f " end";
+      PP.string f "end";
       PP.newline f
   | L.While (cond, body) ->
       PP.string f "while ";
       expression f cond;
-      PP.string f " do ";
+      PP.string f " do";
+      PP.newline f;
       statement_list f body;
-      PP.string f " end";
+      PP.string f "end";
       PP.newline f
   | L.Repeat (body, cond) ->
-      PP.string f "repeat ";
+      PP.string f "repeat";
+      PP.newline f;
       statement_list f body;
-      PP.string f " until ";
+      PP.string f "until ";
       expression f cond;
       PP.newline f
   | L.ForRange (var, start, stop, step, body) ->
@@ -272,18 +277,20 @@ and statement f st =
        | Some s ->
            PP.string f ", ";
            expression f s);
-      PP.string f " do ";
+      PP.string f " do";
+      PP.newline f;
       statement_list f body;
-      PP.string f " end";
+      PP.string f "end";
       PP.newline f
   | L.ForIn (vars, exps, body) ->
       PP.string f "for ";
       comma_list_ident f vars;
       PP.string f " in ";
       comma_list f expression exps;
-      PP.string f " do ";
+      PP.string f " do";
+      PP.newline f;
       statement_list f body;
-      PP.string f " end";
+      PP.string f "end";
       PP.newline f
 
 and statement_list f stmts =
