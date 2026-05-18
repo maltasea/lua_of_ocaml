@@ -8,4 +8,4 @@ test:
 	(cd $(ROOT) && lua test/runtime/obj_test.lua)
 
 clean:
-	rm -f *.byte *.lua *.cmi *.cmo
+	rm -f *.byte *.cmi *.cmo

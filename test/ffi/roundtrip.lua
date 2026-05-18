@@ -1,0 +1,5 @@
+dofile("runtime/lua/ints.lua")
+dofile("runtime/lua/misc.lua")
+print("lu_add(10,20) = " .. lu_add(10,20))
+lu_greet("ocaml")
+print("os_date = " .. os_date("%Y-%m-%d"))

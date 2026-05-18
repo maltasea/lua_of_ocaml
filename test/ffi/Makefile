@@ -6,4 +6,4 @@ test:
 	(cd $(ROOT) && lua test/ffi/ffi_test.lua)
 
 clean:
-	rm -f *.byte *.lua *.cmi *.cmo
+	rm -f *.byte *.cmi *.cmo lu_stubs.o
