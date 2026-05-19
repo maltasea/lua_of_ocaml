@@ -2,8 +2,12 @@ LUA ?= luajit
 
 .PHONY: build test clean hello run help
 
-build:
+build: loo
 	dune build
+
+loo: misc/loo.in
+	sed "s|@ROOT@|$(shell pwd)|" misc/loo.in > loo
+	chmod +x loo
 
 test:
 	LUA=$(LUA) bash test/run_all.sh
