@@ -95,7 +95,9 @@ and translate_constant = function
   | Code.NativeInt i ->
       let n = Int32.(to_int (shift_left i 1)) in
       L.int_ n
-  | Code.Float _ -> make_block (L.int_ 253) [L.int_ 0]
+  | Code.Float f ->
+      let bits = Int64.float_of_bits f in
+      L.table [L.TArray (L.int_ 253); L.TArray (L.ENum (Printf.sprintf "%.17g" bits))]
   | Code.Tuple (tag, fields, _) ->
       let fields = Array.to_list (Array.map fields ~f:translate_constant) in
       make_block (L.int_ tag) fields
