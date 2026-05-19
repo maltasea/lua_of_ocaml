@@ -1,0 +1,23 @@
+#!/bin/sh
+# lua_of_ocaml wrapper — no install needed
+# Usage: ./loo file.byte           writes to stdout
+#        ./loo file.byte -o out    writes to out.lua (adds .lua if missing)
+
+set -e
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+OUT=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) OUT="$2"; shift 2;;
+    *)  IN="$1"; shift;;
+  esac
+done
+
+[ -n "$IN" ] || { echo "Usage: loo <file.byte> [-o output]"; exit 1; }
+[ -n "$OUT" ] || OUT="${IN%.byte}.lua"
+case "$OUT" in *.lua) ;; *) OUT="$OUT.lua";; esac
+
+cd "$ROOT"
+dune exec --root="$ROOT" -- compiler/bin-lua_of_ocaml/main.exe -- "$IN" -o "$OUT"
+echo "$OUT"

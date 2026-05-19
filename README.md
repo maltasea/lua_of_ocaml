@@ -31,6 +31,16 @@ Edit `hello.ml`, then `make hello`.  The Makefile target compiles to
 bytecode, runs lua_of_ocaml, deletes intermediate `.byte`/`.cmi`/`.cmo`,
 and runs the generated `hello.lua`.
 
+Any OCaml bytecode
+----------------
+
+    ocamlc -o prog.byte prog.ml
+    ./loo prog.byte             # writes prog.lua
+    lua prog.lua
+
+No install needed — `./loo` is a wrapper that runs the compiler from the
+build directory.
+
 ## Source tracing
 
 Generated Lua includes `-- file:line` comments at closure boundaries and
