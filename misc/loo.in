@@ -9,11 +9,11 @@ IN=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -o) OUT="$2"; shift 2;;
-    *)  IN="$1"; shift;;
+    *)  [ -z "$IN" ] && IN="$1" || OUT="$1"; shift;;
   esac
 done
 
-[ -n "$IN" ] || { echo "Usage: loo <input.ml|input.byte> [-o output.lua]"; exit 1; }
+[ -n "$IN" ] || { echo "Usage: loo <input.ml|input.byte> [output.lua]"; exit 1; }
 
 TMP="$ROOT/_loo_tmp"
 mkdir -p "$TMP"
