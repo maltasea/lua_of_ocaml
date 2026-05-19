@@ -27,28 +27,27 @@ end
 
 local _update = nil
 local _draw = nil
-function _set_update(fn) _update = fn end
-function _set_draw(fn) _draw = fn end
+function _set_update(fn) io.stderr:write("_set_update called\n"); _update = fn end
+function _set_draw(fn) io.stderr:write("_set_draw called\n"); _draw = fn end
 
-function love.load()
-  love.graphics.setFont(love.graphics.newFont(14))
-end
+function love.load() love.graphics.setFont(love.graphics.newFont(14)) end
 
 function love.update(dt)
   if _update then _update(dt) end
 end
 
 function love.draw()
-  -- Always draw something so we know the game loop runs
   love.graphics.clear(0.2, 0.3, 0.5)
   love.graphics.setColor(1, 1, 1)
   love.graphics.print("LÖVE2D + OCaml FFI", 10, 10)
   love.graphics.setColor(0, 1, 0)
   love.graphics.rectangle("fill", 100, 100, 50, 50)
-  -- Then call OCaml draw if registered
   if _draw then _draw() end
 end
 
 function love.keypressed(key)
   if key == "escape" then love.event.quit() end
 end
+
+-- Debug: is _main being called?
+io.stderr:write("main.lua loading, _main type=" .. type(_main) .. "\n")
