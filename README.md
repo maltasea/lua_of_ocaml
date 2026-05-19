@@ -89,7 +89,7 @@ OCaml values in Lua: integers are tagged (`n*2`), floats are boxed
 (`{253, value}`), strings are plain Lua strings, blocks are
 `{tag, field1, field2, ...}`.
 
-Examples: `examples/love2d/` — a LÖVE2D platformer using OCaml → Lua FFI.
+Examples: `examples/game/` — a LÖVE2D platformer using OCaml → Lua FFI.
 
 Tests
 -----
