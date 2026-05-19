@@ -113,14 +113,14 @@ end
 caml_atomic_set = caml_atomic_store
 
 -- Batch stubs for stdlib initialization
-caml_sys_const_backend_type = 0
-caml_sys_const_big_endian = 0
-caml_sys_const_int_size = 0
-caml_sys_const_max_wosize = 0
-caml_sys_const_ostype_cygwin = 0
-caml_sys_const_ostype_unix = 2
-caml_sys_const_ostype_win = 0
-caml_sys_const_word_size = 0
+caml_sys_const_backend_type = function() return 0 end
+caml_sys_const_big_endian = function() return 0 end
+caml_sys_const_int_size = function() return 0 end
+caml_sys_const_max_wosize = function() return 0 end
+caml_sys_const_ostype_cygwin = function() return 0 end
+caml_sys_const_ostype_unix = function() return 2 end
+caml_sys_const_ostype_win = function() return 0 end
+caml_sys_const_word_size = function() return 0 end
 caml_sys_convert_signal_number = function(_) return 0 end
 caml_sys_getenv_opt = function(_) return 0 end
 caml_sys_io_buffer_size = function() return 0 end
