@@ -72,9 +72,9 @@ end
 function caml_atomic_cas(obj, old_val, new_val)
   if obj[2] == old_val then
     obj[2] = new_val
-    return true
+    return 2
   end
-  return false
+  return 0
 end
 
 function caml_atomic_load_field(obj, field_idx)
@@ -84,8 +84,8 @@ end
 
 function caml_atomic_cas_field(obj, field_idx, old_val, new_val, _success)
   local pos = math_floor(field_idx / 2) + 2
-  if obj[pos] == old_val then obj[pos] = new_val; return true end
-  return false
+  if obj[pos] == old_val then obj[pos] = new_val; return 2 end
+  return 0
 end
 
 function caml_atomic_exchange_field(obj, field_idx, new_val)

@@ -2,10 +2,14 @@
 -- lua_of_ocaml runtime: standard library (globals, call support)
 -- Provides: caml_register_global caml_register_named_value caml_get_global
 --           caml_fresh_oo_id caml_call_gen caml_set_global caml_bind_frame
+--           caml_equal caml_notequal
 
 local math_floor = math.floor
 
 caml_global_data = {}
+
+function caml_equal(a, b) return a == b end
+function caml_notequal(a, b) return a ~= b end
 
 function caml_register_global(id, name, v)
   caml_global_data[id + 1] = v
@@ -396,6 +400,29 @@ function lua_greet(name)
 end
 os_date = os.date
 
+function caml_atomic_load(obj)
+  return obj[2] or 0
+end
+
+function caml_atomic_store(obj, val)
+  obj[2] = val
+  return 0
+end
+
+function caml_atomic_exchange(obj, new_val)
+  local old = obj[2] or 0
+  obj[2] = new_val
+  return old
+end
+
+function caml_atomic_cas(obj, old_val, new_val)
+  if obj[2] == old_val then
+    obj[2] = new_val
+    return 2
+  end
+  return 0
+end
+
 function caml_atomic_load_field(obj, field_idx)
   local pos = math_floor(field_idx / 2) + 2
   return obj[pos] or 0
@@ -420,8 +447,7 @@ function caml_atomic_set_field(obj, field_idx, val)
   local pos = math_floor(field_idx / 2) + 2; obj[pos] = val; return 0
 end
 
-caml_atomic_load = caml_atomic_load_field
-caml_atomic_cas = caml_atomic_cas_field
+caml_atomic_set = caml_atomic_store
 
 _main = function() -- # <unknown>
 Out_of_memory_359 = nil
