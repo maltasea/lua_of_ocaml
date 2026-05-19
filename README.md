@@ -4,7 +4,7 @@ loo - lua_of_ocaml
 Compiles OCaml bytecode programs to Lua 5.1, inspired by js_of_ocaml.
 
 > **Note:** this project was written in a heavily guided, multi-hour
-> chat session with Claude Code (Claude Opus 4.7) — nothing agentic.
+> chat session with Claude Code (Model: Deepseek v4.0) — nothing agentic.
 
 First steps
 -----------

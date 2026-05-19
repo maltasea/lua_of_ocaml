@@ -294,9 +294,9 @@ and compile_block_no_loop ~fall_through structure dom visited_blocks
 (* ---- Conditional: handle the last instruction of a block ---- *)
 
 and compile_conditional ~fall_through structure dom visited_blocks
-    blocks merge_blocks parent_block _scope_stack last =
+    blocks merge_blocks parent_block scope_stack last =
 
-  let branch ~fall_through pc args scope_stack =
+  let branch ~fall_through pc args =
     compile_branch ~fall_through structure dom visited_blocks
       blocks merge_blocks parent_block (pc, args) scope_stack
   in
@@ -307,11 +307,11 @@ and compile_conditional ~fall_through structure dom visited_blocks
       [L.ExprStmt (L.call (L.EVar (L.ident "caml_raise")) [evar x])]
   | Code.Stop -> [L.Return []]
   | Code.Branch (pc', args) ->
-      branch ~fall_through pc' args []
+      branch ~fall_through pc' args
 
   | Code.Cond (x, (pc1, args1), (pc2, args2)) ->
-      let body1 = branch ~fall_through pc1 args1 [] in
-      let body2 = branch ~fall_through pc2 args2 [] in
+      let body1 = branch ~fall_through pc1 args1 in
+      let body2 = branch ~fall_through pc2 args2 in
       [L.If (evar x, body1, [], Some body2)]
 
   | Code.Switch (x, cases) ->
@@ -320,16 +320,16 @@ and compile_conditional ~fall_through structure dom visited_blocks
         if i >= n then []
         else
           let (pc', args') = cases.(i) in
-          let body = branch ~fall_through pc' args' [] in
+          let body = branch ~fall_through pc' args' in
           let cond = L.bin L.Eq (evar x) (L.int_ i) in
           L.If (cond, body, [], None) :: build (i + 1)
       in
       build 0
 
   | Code.Pushtrap ((pc_h, args_h), x, (pc_c, args_c)) ->
-      (* pcall-based try-catch *)
-      let body_c = branch ~fall_through pc_c args_c [] in
-      let body_h = branch ~fall_through pc_h (x :: args_h) [] in
+      (* pcall-based try-catch: pc_h=continuation, pc_c=handler (swapped in IR) *)
+      let body_c = branch ~fall_through pc_h args_h in
+      let body_h = branch ~fall_through pc_c (x :: args_c) in
       let ok_var = L.ident "_ok" in
       let res_var = L.ident "_res" in
       [ L.Local ([ok_var; res_var],
@@ -338,7 +338,7 @@ and compile_conditional ~fall_through structure dom visited_blocks
       ; L.If (L.EVar ok_var,
               [L.Assign ([evar x], [L.EVar res_var])],
               [],
-              Some (L.Assign ([evar x], [L.EVar res_var]) :: body_h))
+              Some (L.Assign ([evar x], [L.EVar (L.ident "_caml_exn")]) :: body_h))
       ]
 
   | Code.Poptrap _ ->

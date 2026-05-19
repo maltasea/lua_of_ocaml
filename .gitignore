@@ -1,3 +1,4 @@
+external/
 *.byte
 report.txt
 *.cmi
