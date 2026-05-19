@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>loo — lua_of_ocaml</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&family=Press+Start+2P&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0f0f23;
+    color: #c0c0ff;
+    font-family: 'Comic Neue', cursive;
+    line-height: 1.7;
+    background-image:
+      radial-gradient(circle at 20% 80%, rgba(255,100,200,0.08) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(100,255,200,0.08) 0%, transparent 50%),
+      radial-gradient(circle at 50% 50%, rgba(100,100,255,0.05) 0%, transparent 70%);
+  }
+
+  .banner {
+    text-align: center;
+    padding: 60px 20px 40px;
+    background: linear-gradient(135deg, #1a1a3e, #2d1a3e, #1a3e2d);
+    border-bottom: 3px dashed #ff66aa;
+    position: relative;
+    overflow: hidden;
+  }
+  .banner::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="20" font-size="20">&#x1f414;</text><text x="70" y="80" font-size="30">&#x1f95A;</text><text x="30" y="60" font-size="15">&#x2728;</text><text x="80" y="30" font-size="12">&#x1f4a5;</text></svg>');
+    opacity: 0.15;
+    pointer-events: none;
+  }
+  .banner img {
+    max-width: 300px;
+    border-radius: 20px;
+    border: 4px solid #ff66aa;
+    box-shadow: 0 0 60px rgba(255,100,170,0.4);
+    transform: rotate(-3deg);
+    transition: transform 0.3s;
+  }
+  .banner img:hover { transform: rotate(3deg) scale(1.05); }
+  .banner h1 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 2.2em;
+    color: #ff66aa;
+    margin-top: 20px;
+    text-shadow: 3px 3px 0 #331144, -1px -1px 0 #ffaacc;
+  }
+  .banner p {
+    color: #aaaacc;
+    font-size: 1.2em;
+    margin-top: 8px;
+  }
+  .banner .tagline {
+    color: #88ff88;
+    font-style: italic;
+    margin-top: 12px;
+    font-size: 1.1em;
+  }
+
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 30px 20px;
+  }
+
+  h2 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 1.1em;
+    color: #ffaa44;
+    margin: 40px 0 15px;
+    padding-bottom: 8px;
+    border-bottom: 2px dotted #ffaa44;
+  }
+  h3 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.8em;
+    color: #aaddff;
+    margin: 25px 0 10px;
+  }
+
+  pre, code {
+    background: #1a1a35;
+    border: 1px solid #3333aa;
+    border-radius: 8px;
+    padding: 15px 20px;
+    overflow-x: auto;
+    font-size: 0.9em;
+    color: #aaffaa;
+    line-height: 1.6;
+  }
+  code { padding: 2px 6px; }
+  pre code { padding: 0; background: none; border: none; }
+
+  blockquote {
+    border-left: 4px solid #ff66aa;
+    padding: 10px 20px;
+    margin: 15px 0;
+    background: rgba(255,100,170,0.08);
+    border-radius: 0 8px 8px 0;
+    font-style: italic;
+    color: #ddaacc;
+  }
+
+  a { color: #ffaadd; text-decoration: underline wavy #ff66aa; }
+  a:hover { color: #ffccff; }
+
+  .note {
+    background: #2a1a35;
+    border: 1px solid #ff66aa;
+    border-radius: 12px;
+    padding: 15px 20px;
+    margin: 20px 0;
+    font-style: italic;
+    color: #ddaacc;
+  }
+
+  .architecture {
+    background: #111133;
+    border: 2px solid #333388;
+    border-radius: 12px;
+    padding: 20px;
+    overflow-x: auto;
+    font-family: monospace;
+    font-size: 0.85em;
+    line-height: 1.9;
+    color: #aaaacc;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+  }
+  th, td {
+    border: 1px solid #333388;
+    padding: 8px 12px;
+    text-align: left;
+  }
+  th { background: #1a1a3e; color: #ffaa44; font-family: 'Press Start 2P', monospace; font-size: 0.7em; }
+  td { font-size: 0.9em; }
+
+  .footer {
+    text-align: center;
+    padding: 30px;
+    color: #6666aa;
+    font-size: 0.85em;
+    border-top: 2px dashed #333388;
+    margin-top: 50px;
+  }
+
+  .emoji { font-size: 1.3em; }
+
+  @media (max-width: 600px) {
+    .banner h1 { font-size: 1.3em; }
+    .container { padding: 15px; }
+    pre { font-size: 0.75em; padding: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <img src="misc/loo.jpg" alt="loo chicken" onerror="this.style.display='none'">
+  <h1>loo</h1>
+  <p>lua_of_ocaml</p>
+  <p class="tagline">
+    <span class="emoji">&#x1f414;</span> OCaml &#x2192; Lua 5.1, because why the hell not
+    <span class="emoji">&#x1f95A;</span>
+  </p>
+</div>
+
+<div class="container">
+
+<div class="note">
+  <span class="emoji">&#x1f916;</span> This project was written in a heavily guided, multi-hour
+  chat session with Claude Code (Opus 4.7) — nothing agentic, just vibes.
+</div>
+
+<h2>&#x1f680; First Steps</h2>
+
+<h3>1. Install</h3>
+<pre><code>opam install js_of_ocaml-compiler
+git clone git@github.com:maltasea/lua_of_ocaml.git
+cd lua_of_ocaml
+dune build</code></pre>
+
+<h3>2. Run hello world</h3>
+<pre><code>echo 'let () = print_endline "hello from lua"' &gt; hello.ml
+make hello</code></pre>
+<pre><code>hello from lua</code></pre>
+
+<h3>3. Write your own</h3>
+<p>Edit <code>hello.ml</code>, then <code>make hello</code>. The Makefile compiles to
+bytecode, runs lua_of_ocaml, deletes intermediate <code>.byte</code>/<code>.cmi</code>/<code>.cmo</code>,
+and runs the generated <code>hello.lua</code>.</p>
+
+<h3>Any OCaml bytecode</h3>
+<pre><code>./loo.sh prog.ml              # .ml -> stdout
+./loo.sh prog.ml out.lua      # .ml -> out.lua
+lua out.lua</code></pre>
+<p><code>./loo.sh</code> is generated by <code>make</code> — zero install needed.</p>
+
+<h2>&#x1f527; Architecture</h2>
+<div class="architecture">
+OCaml source &#x2192; ocamlc &#x2192; bytecode (.byte)<br>
+&nbsp;&nbsp;&#x2192; js_of_ocaml parser (reused)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&#x2192; IR (Code.program)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#x2192; lua_of_ocaml code generator (generate_lua.ml)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#x2192; Lua AST<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#x2192; output_lua.ml<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#x2192; .lua text + runtime/lua/*.lua<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#x2192; lua hello.lua
+</div>
+<p style="margin-top:10px;">The IR from js_of_ocaml is target-agnostic. lua_of_ocaml reuses the
+bytecode parser and optimizations, providing a structural CFG code generator
+modeled on js_of_ocaml's generate.ml.</p>
+
+<h2>&#x1f3d7; Files</h2>
+<table>
+<tr><th>File</th><th>What</th></tr>
+<tr><td><code>compiler/lib/lua.ml</code></td><td>Lua 5.1 AST</td></tr>
+<tr><td><code>compiler/lib/output_lua.ml</code></td><td>Lua pretty printer</td></tr>
+<tr><td><code>compiler/lib/generate_lua.ml</code></td><td>Code generator (IR &#x2192; Lua)</td></tr>
+<tr><td><code>compiler/bin-lua_of_ocaml/</code></td><td>CLI entry point</td></tr>
+<tr><td><code>runtime/lua/*.lua</code></td><td>Lua runtime (split files)</td></tr>
+<tr><td><code>test/hello.ml</code></td><td>Example OCaml program</td></tr>
+</table>
+
+<h2>&#x1f91d; FFI: Calling Lua from OCaml</h2>
+<p>OCaml <code>external</code> declarations become direct Lua function calls.
+A dummy C stub is needed only so ocamlc can link:</p>
+
+<pre><code>(* mylib.ml *)
+external lua_fn : int -> int -> int = "lua_fn"</code></pre>
+
+<pre><code>/* mylib_stubs.c — empty, just for linking */
+#include &lt;caml/mlvalues.h&gt;
+CAMLprim value lua_fn(value a, value b) { (void)a; (void)b; return Val_int(0); }</code></pre>
+
+<pre><code>ocamlc -c mylib_stubs.c
+ocamlc -c mylib.ml
+ocamlc -custom -o mylib.byte mylib_stubs.o mylib.cmo
+./loo.sh mylib.byte -o mylib.lua</code></pre>
+
+<p>The generated Lua calls <code>lua_fn(...)</code> directly. The C code is only
+compiled and linked — it is <strong>never executed</strong>. Same mechanism as
+js_of_ocaml's <code>libjs_of_ocaml_stubs.a</code>.</p>
+
+<h3>Defining the Lua side</h3>
+<p>Add functions to <code>runtime/lua/misc.lua</code> (or any <code>.lua</code> file loaded
+before the generated code). They become callable from OCaml via <code>external</code>:</p>
+
+<pre><code>-- in runtime/lua/misc.lua:
+function lua_fn(a, b)
+  -- a, b are tagged OCaml ints (value * 2)
+  return a + b
+end</code></pre>
+
+<p>OCaml values in Lua: integers are tagged (<code>n*2</code>), floats are boxed
+(<code>{253, value}</code>), strings are plain Lua strings, blocks are
+<code>{tag, field1, field2, ...}</code>.</p>
+
+<p>Example: <a href="example-game/"><code>example-game/</code></a> — a LÖVE2D chicken jump platformer
+using OCaml &#x2192; Lua FFI.</p>
+
+<h2>&#x1f4dd; Source Tracing</h2>
+<p>Generated Lua includes <code>--# file:line</code> comments at closure boundaries and
+block entry points mapping back to OCaml source. Compile with <code>-g</code>:</p>
+<pre><code>ocamlc -g -o hello.byte hello.ml</code></pre>
+
+<h2>&#x1f9ea; Tests</h2>
+<pre><code>bash test/run_all.sh</code></pre>
+<p>Runs 24 tests: compiler smoke, source tracing, Lua runtime unit tests, FFI tests.
+Also: <code>bash test/behavioral/run.sh</code> — 5 tests comparing OCaml vs Lua output.</p>
+
+<h2>&#x1f4dc; License</h2>
+<p>LGPL-2.1-or-later WITH OCaml-LGPL-linking-exception (same as js_of_ocaml).</p>
+
+<div class="footer">
+  <span class="emoji">&#x1f414;</span> chicken jump forever <span class="emoji">&#x1f95A;</span><br><br>
+  <small>lua_of_ocaml — OCaml compiler targeting Lua 5.1</small>
+</div>
+
+</div>
+</body>
+</html>
