@@ -13,21 +13,11 @@ end
 function lg_set_color(r, g, b, a)
   love.graphics.setColor(ocaml_val(r), ocaml_val(g), ocaml_val(b), ocaml_val(a or 1))
 end
-function lg_get_width()
-  return love.graphics.getWidth() * 2
-end
-function lg_get_height()
-  return love.graphics.getHeight() * 2
-end
-function lk_is_down(key)
-  return love.keyboard.isDown(key)
-end
-function lt_get_delta()
-  return love.timer.getDelta()
-end
-function le_quit()
-  love.event.quit()
-end
+function lg_get_width() return love.graphics.getWidth() * 2 end
+function lg_get_height() return love.graphics.getHeight() * 2 end
+function lk_is_down(key) return love.keyboard.isDown(key) end
+function lt_get_delta() return love.timer.getDelta() end
+function le_quit() love.event.quit() end
 function lg_clear(r, g, b, a)
   love.graphics.clear(ocaml_val(r), ocaml_val(g), ocaml_val(b), ocaml_val(a or 1))
 end
@@ -37,26 +27,26 @@ end
 
 local _update = nil
 local _draw = nil
-function _set_update(fn) _update = fn end
-function _set_draw(fn) _draw = fn end
+function _set_update(fn) print("_set_update called"); _update = fn end
+function _set_draw(fn) print("_set_draw called"); _draw = fn end
 
 function love.load()
   love.graphics.setFont(love.graphics.newFont(14))
-  print("love.load called")
+  print("love.load called, _update=" .. tostring(_update) .. " _draw=" .. tostring(_draw))
 end
 
 function love.update(dt)
   if _update then
     local ok, err = pcall(_update, dt)
     if not ok then print("update error: " .. tostring(err)) end
-  end
+  else print("no _update") end
 end
 
 function love.draw()
   if _draw then
     local ok, err = pcall(_draw)
     if not ok then print("draw error: " .. tostring(err)) end
-  end
+  else print("no _draw") end
 end
 
 function love.keypressed(key)
