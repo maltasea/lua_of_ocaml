@@ -16,11 +16,15 @@ done
 
 [ -n "$IN" ] || { echo "Usage: loo <input.ml|input.byte> [output.lua]"; exit 1; }
 
+# Resolve paths before cd so relative paths work
+case "$IN"  in /*) ;; *) IN="$(pwd)/$IN";; esac
+case "$OUT" in /*|"") ;; *) OUT="$(pwd)/$OUT";; esac
+
 TMP="$ROOT/_loo_tmp"
 mkdir -p "$TMP"
 
 case "$IN" in
-  *.ml)   (cd "$ROOT" && ocamlc -g -o "$TMP/_in.byte" "$IN"); BYTE="$TMP/_in.byte";;
+  *.ml)   ocamlc -g -o "$TMP/_in.byte" "$IN"; BYTE="$TMP/_in.byte";;
   *.byte) BYTE="$IN";;
   *)      echo "loo: expected .ml or .byte file, got $IN"; exit 1;;
 esac
