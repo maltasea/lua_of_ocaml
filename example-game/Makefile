@@ -5,12 +5,12 @@ LOVE ?= love
 .PHONY: run clean
 
 liblove_stubs.a: love_stubs.c
-	ocamlc -c love_stubs.c
+	ocamlc -g -c love_stubs.c
 	ar rcs liblove_stubs.a love_stubs.o
 
 main.byte: main.ml liblove_stubs.a
-	ocamlc -c main.ml
-	ocamlc -custom -o main.byte love_stubs.o main.cmo
+	ocamlc -g -c main.ml
+	ocamlc -g -custom -o main.byte love_stubs.o main.cmo
 
 main.lua: main.byte
 	$(LOO) main.byte -o _gen.lua
