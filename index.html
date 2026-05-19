@@ -3,228 +3,209 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>loo — lua_of_ocaml</title>
+<title>loo ~ lua_of_ocaml</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Gaegu&family=Patrick+Hand&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    background: #0d0d18;
-    color: #8899aa;
-    font-family: 'Courier New', monospace;
-    line-height: 1.6;
-    font-size: 15px;
-    padding-bottom: 60px;
-    position: relative;
-  }
-
-  /* broken CRT scanlines */
-  body::after {
-    content: '';
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0,0,0,0.06) 2px,
-      rgba(0,0,0,0.06) 4px
-    );
-    pointer-events: none;
-    z-index: 999;
-  }
-
-  /* fuzzy vignette */
-  body::before {
-    content: '';
-    position: fixed;
-    top: -30px; left: -30px; right: -30px; bottom: -30px;
-    box-shadow: inset 0 0 120px rgba(0,0,0,0.5);
-    pointer-events: none;
-    z-index: 998;
+    background: #faf5ed;
+    color: #5c4d3c;
+    font-family: 'Patrick Hand', cursive;
+    font-size: 18px;
+    line-height: 1.7;
+    background-image:
+      radial-gradient(ellipse at 30% 20%, #fff3e0 0%, transparent 50%),
+      radial-gradient(ellipse at 70% 80%, #fce4ec 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 50%, #e8f5e9 0%, transparent 70%);
+    background-attachment: fixed;
   }
 
   .banner {
     text-align: center;
-    padding: 50px 20px 35px;
-    background: linear-gradient(180deg, #111828 0%, #0e1420 100%);
-    border-bottom: 1px solid #223344;
+    padding: 40px 20px 25px;
     position: relative;
-    overflow: hidden;
-  }
-  .banner::before {
-    content: '';
-    position: absolute;
-    top: -10px; left: -10px; right: -10px; bottom: -10px;
-    background: repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 3px,
-      rgba(255,255,255,0.008) 3px,
-      rgba(255,255,255,0.008) 5px
-    );
-    pointer-events: none;
   }
   .banner img {
-    max-width: 200px;
-    border-radius: 3px;
-    border: 2px solid #334455;
-    box-shadow: 0 0 40px rgba(40,80,120,0.3);
-    image-rendering: pixelated;
-    filter: brightness(0.9) contrast(1.05) saturate(0.7);
+    max-width: 180px;
+    border-radius: 50%;
+    border: 3px dashed #e8c4b8;
+    padding: 4px;
+    background: #fffbf5;
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.04), 8px 8px 0 rgba(0,0,0,0.02);
+    transform: rotate(-2deg);
+    transition: transform 0.4s ease;
+    image-rendering: auto;
+  }
+  .banner img:hover {
+    transform: rotate(5deg) scale(1.06);
   }
   .banner h1 {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 1.6em;
-    color: #667788;
-    margin-top: 16px;
-    letter-spacing: 2px;
-    text-shadow: 2px 2px 0 #0a0a15;
+    font-family: 'Gaegu', cursive;
+    font-size: 3em;
+    color: #c4956a;
+    margin-top: 10px;
+    font-weight: 400;
+    letter-spacing: -1px;
+    transform: rotate(-0.5deg);
   }
   .banner .sub {
-    color: #445566;
-    font-size: 0.8em;
-    margin-top: 6px;
+    color: #b8a890;
+    font-size: 1em;
+    margin-top: 2px;
   }
   .banner .tagline {
-    color: #3a5a4a;
+    color: #c8b8a0;
+    font-size: 0.9em;
+    margin-top: 6px;
     font-style: italic;
-    margin-top: 10px;
-    font-size: 0.85em;
   }
 
   .container {
-    max-width: 680px;
+    max-width: 620px;
     margin: 0 auto;
-    padding: 25px 18px;
+    padding: 10px 20px 50px;
   }
 
   h2 {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.75em;
-    color: #556677;
-    margin: 35px 0 12px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid #1a2a35;
-    letter-spacing: 1px;
+    font-family: 'Gaegu', cursive;
+    font-size: 1.6em;
+    color: #c4956a;
+    margin: 35px 0 10px;
+    font-weight: 400;
+    border-bottom: 1px dotted #e8d8c8;
+    padding-bottom: 4px;
+    transform: rotate(-0.3deg);
   }
   h3 {
-    font-family: 'Press Start 2P', monospace;
-    font-size: 0.6em;
-    color: #445566;
-    margin: 20px 0 8px;
+    font-family: 'Gaegu', cursive;
+    font-size: 1.2em;
+    color: #b8a090;
+    margin: 18px 0 6px;
+    font-weight: 400;
   }
 
   pre {
-    background: #0a0d15;
-    border: 1px solid #1a2530;
-    border-radius: 2px;
-    padding: 12px 16px;
+    background: #fffbf5;
+    border: 1px solid #f0e4d4;
+    border-radius: 6px;
+    padding: 14px 18px;
     overflow-x: auto;
-    font-size: 0.82em;
-    color: #779988;
-    line-height: 1.55;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8em;
+    color: #7a6d5c;
+    line-height: 1.6;
+    box-shadow: 2px 2px 0 rgba(0,0,0,0.02);
   }
   code {
-    color: #889988;
-    font-size: 0.92em;
+    font-size: 0.9em;
+    color: #8a7d6c;
   }
-  pre code { color: #779988; }
+  pre code { color: #7a6d5c; background: none; }
 
   blockquote {
-    border-left: 2px solid #334455;
+    border-left: 3px solid #f0d4c4;
     padding: 8px 16px;
     margin: 12px 0;
-    background: rgba(20,30,40,0.4);
-    border-radius: 0 2px 2px 0;
+    background: #fffbf5;
     font-style: italic;
-    color: #667788;
-    font-size: 0.9em;
+    color: #a09080;
+    border-radius: 0 6px 6px 0;
   }
 
-  a { color: #6688aa; text-decoration: underline; text-underline-offset: 3px; }
-  a:hover { color: #88aacc; }
+  a { color: #c4956a; text-decoration: none; border-bottom: 1px dotted #e8c4b8; }
+  a:hover { color: #b08060; border-bottom-color: #c4956a; }
 
   .note {
-    background: rgba(20,35,30,0.5);
-    border: 1px solid #1a3525;
+    background: #fffbf5;
+    border: 1px dashed #e8d8c8;
     padding: 12px 16px;
-    margin: 18px 0;
+    margin: 16px 0;
     font-style: italic;
-    color: #667766;
+    color: #b0a090;
+    border-radius: 8px;
     font-size: 0.9em;
   }
 
   .arch {
-    background: #080c15;
-    border: 1px solid #1a2530;
-    padding: 16px;
-    margin: 8px 0;
+    background: #fffbf5;
+    border: 1px solid #f0e4d4;
+    padding: 14px 18px;
+    margin: 6px 0;
     font-family: 'Courier New', monospace;
-    font-size: 0.8em;
+    font-size: 0.78em;
     line-height: 2;
-    color: #667788;
+    color: #8a7d6c;
     overflow-x: auto;
+    border-radius: 6px;
+    box-shadow: 2px 2px 0 rgba(0,0,0,0.02);
   }
 
   table {
     width: 100%;
     border-collapse: collapse;
-    margin: 12px 0;
-    font-size: 0.85em;
+    margin: 10px 0;
+    font-size: 0.88em;
+    background: #fffbf5;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 2px 2px 0 rgba(0,0,0,0.02);
   }
   th, td {
-    border: 1px solid #1a2530;
-    padding: 6px 10px;
+    border: 1px solid #f0e4d4;
+    padding: 7px 12px;
     text-align: left;
   }
-  th { background: #0e1420; color: #556677; font-family: 'Press Start 2P', monospace; font-size: 0.55em; }
-  td { color: #778899; }
+  th {
+    background: #fdf5eb;
+    color: #b8957a;
+    font-family: 'Gaegu', cursive;
+    font-size: 1em;
+    font-weight: 400;
+  }
+  td { color: #7a6d5c; }
 
   .footer {
     text-align: center;
     padding: 25px;
-    color: #334455;
-    font-size: 0.75em;
-    border-top: 1px solid #1a2530;
+    color: #c8b8a0;
+    font-size: 0.8em;
+    border-top: 1px dotted #e8d8c8;
     margin-top: 40px;
   }
 
-  .glitch {
-    animation: glitch 0.3s steps(1) infinite;
-    animation-play-state: paused;
-  }
-  .glitch:hover { animation-play-state: running; }
-  @keyframes glitch {
-    0%, 100% { transform: translate(0); }
-    20% { transform: translate(-1px, 1px); }
-    40% { transform: translate(1px, -1px); }
-    60% { transform: translate(-1px, -1px); }
-    80% { transform: translate(1px, 1px); }
+  .stamp {
+    display: inline-block;
+    border: 2px solid #e8c4b8;
+    color: #d4a090;
+    padding: 4px 10px;
+    transform: rotate(-5deg);
+    font-family: 'Gaegu', cursive;
+    font-size: 0.9em;
+    margin: 8px 0;
   }
 
   @media (max-width: 600px) {
-    .banner h1 { font-size: 1.1em; }
-    .container { padding: 12px; }
-    pre { font-size: 0.7em; padding: 8px; }
+    .banner h1 { font-size: 2em; }
+    .container { padding: 8px 12px; }
+    pre { font-size: 0.7em; padding: 10px; }
   }
 </style>
 </head>
 <body>
 
 <div class="banner">
-  <img src="misc/loo.jpg" alt="loo" onerror="this.style.display='none'">
-  <h1 class="glitch">lua_of_ocaml</h1>
+  <img src="misc/loo.jpg" alt="looooo" onerror="this.style.display='none'">
+  <h1>lua_of_ocaml</h1>
   <p class="sub">ocaml &rarr; lua 5.1</p>
-  <p class="tagline">chicken jump forever</p>
+  <p class="tagline"><span class="stamp">chicken jump forever</span></p>
 </div>
 
 <div class="container">
 
 <div class="note">
-  written in a long chat session with claude code (opus 4.7)
-  &mdash; nothing agentic, just vibes.
+  made in a long chat with claude code ~ just vibes, nothing agentic
 </div>
 
 <h2>first steps</h2>
@@ -235,34 +216,34 @@ git clone git@github.com:maltasea/lua_of_ocaml.git
 cd lua_of_ocaml
 dune build</pre>
 
-<h3>2. hello</h3>
+<h3>2. hello world</h3>
 <pre>echo 'let () = print_endline "hello from lua"' &gt; hello.ml
 make hello</pre>
 <pre>hello from lua</pre>
 
-<h3>3. your own</h3>
+<h3>3. your own programs</h3>
 <p>edit <code>hello.ml</code>, <code>make hello</code>. compiles to bytecode,
-runs lua_of_ocaml, cleans up intermediates, runs the lua.</p>
+translates to lua, cleans up, runs.</p>
 
 <h3>any bytecode</h3>
 <pre>./loo.sh prog.ml              # .ml &rarr; stdout
 ./loo.sh prog.ml out.lua      # .ml &rarr; out.lua
 lua out.lua</pre>
-<p><code>./loo.sh</code> is generated by <code>make</code>. no install needed.</p>
+<p><code>./loo.sh</code> is built by <code>make</code>. no install needed.</p>
 
 <h2>how it works</h2>
 <div class="arch">
 ocaml source<br>
 &nbsp;&rarr; ocamlc &rarr; bytecode<br>
-&nbsp;&nbsp;&rarr; js_of_ocaml parser (reused)<br>
+&nbsp;&nbsp;&rarr; jsoo parser (reused)<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&rarr; IR (Code.program)<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr; generate_lua.ml &rarr; Lua AST<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr; output_lua.ml &rarr; .lua text<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ runtime/lua/*.lua<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr; luajit hello.lua
 </div>
-<p style="margin-top:8px; font-size:0.85em; color:#556677;">
-reuses jsoo's IR and optimizations. structural CFG codegen modeled on jsoo's generate.ml.
+<p style="margin-top:8px; font-size:0.85em;">
+reuses jsoo's IR and optimizations. the code generator mirrors jsoo's generate.ml.
 </p>
 
 <h2>files</h2>
@@ -270,19 +251,20 @@ reuses jsoo's IR and optimizations. structural CFG codegen modeled on jsoo's gen
 <tr><th>file</th><th>what</th></tr>
 <tr><td><code>compiler/lib/lua.ml</code></td><td>lua 5.1 ast</td></tr>
 <tr><td><code>compiler/lib/output_lua.ml</code></td><td>lua pretty printer</td></tr>
-<tr><td><code>compiler/lib/generate_lua.ml</code></td><td>code generator (ir &rarr; lua)</td></tr>
-<tr><td><code>compiler/bin-lua_of_ocaml/</code></td><td>cli entry point</td></tr>
-<tr><td><code>runtime/lua/*.lua</code></td><td>lua runtime (8 files)</td></tr>
-<tr><td><code>test/</code></td><td>test suite (24+5 tests)</td></tr>
+<tr><td><code>compiler/lib/generate_lua.ml</code></td><td>ir &rarr; lua code generator</td></tr>
+<tr><td><code>compiler/bin-lua_of_ocaml/</code></td><td>cli tool</td></tr>
+<tr><td><code>runtime/lua/*.lua</code></td><td>lua runtime (8 tiny files)</td></tr>
+<tr><td><code>test/</code></td><td>tests (24+5)</td></tr>
 </table>
 
-<h2>ffi: ocaml &harr; lua</h2>
-<p><code>external</code> declarations become direct lua calls. dummy c stubs satisfy ocamlc's linker. the compiler replaces them.</p>
+<h2>ffi: ocaml talking to lua</h2>
+<p><code>external</code> becomes a direct lua call. a dummy c stub makes ocamlc happy.
+the compiler throws the stub away.</p>
 
 <pre>(* mylib.ml *)
 external lua_add : int -> int -> int = "lua_add"</pre>
 
-<pre>/* mylib_stubs.c — empty, just for linking */
+<pre>/* mylib_stubs.c &mdash; empty, just so ocamlc links */
 #include &lt;caml/mlvalues.h&gt;
 CAMLprim value lua_add(value a, value b) { return Val_int(0); }</pre>
 
@@ -294,20 +276,20 @@ ocamlc -custom -o mylib.byte mylib_stubs.o mylib.cmo
 <p>ocaml values in lua: ints tagged (<code>n*2</code>), floats boxed (<code>{253, v}</code>),
 strings plain, blocks <code>{tag, f1, f2, ...}</code>.</p>
 
-<p>working example: <a href="example-game/"><code>example-game/</code></a> &mdash; l&ouml;ve2d chicken jump.</p>
+<p>real example: <a href="example-game/"><code>example-game/</code></a> &mdash; l&ouml;ve2d chicken jump.</p>
 
 <h2>source tracing</h2>
-<p>generated lua has <code>--# file:line</code> comments. add <code>-g</code> to ocamlc.</p>
+<p>generated lua has <code>--# file:line</code> markers. compile with <code>-g</code>.</p>
 
 <h2>tests</h2>
 <pre>make test                          # 24 tests
-bash test/behavioral/run.sh        # 5 behavioral tests</pre>
+bash test/behavioral/run.sh        # 5 behavioral (output comparison)</pre>
 
 <h2>license</h2>
-<p>lgpl-2.1-or-later with ocaml-lgpl-linking-exception (same as jsoo).</p>
+<p>lgpl-2.1-or-later with ocaml-lgpl-linking-exception. same as jsoo.</p>
 
 <div class="footer">
-  <small>lua_of_ocaml &mdash; ocaml &rarr; lua 5.1 compiler</small>
+  <small>lua_of_ocaml &mdash; ocaml to lua 5.1</small>
 </div>
 
 </div>
