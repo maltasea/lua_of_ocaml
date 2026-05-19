@@ -32,8 +32,16 @@ function caml_int64_float_of_bits(_) return 0 end
 function caml_int64_bits_of_float(_) return 0 end
 
 function caml_sys_executable_name(_) return "" end
+function caml_sys_get_config(_) return "" end
+function caml_sys_getenv(_) return 0 end
+function caml_sys_system(_) return 0 end
 function caml_sys_exit(code) os.exit(math_floor(code / 2)) end
 function caml_sys_open(_path, _flags, _perm) return 0 end
+function caml_sys_file_exists(_) return 0 end
+function caml_sys_is_directory(_) return 0 end
+function caml_sys_time() return 0 end
+function caml_sys_random_seed() return 0 end
+function caml_sys_get_argv() return {0} end
 
 function caml_input_value(_chan) return 0 end
 function caml_output_value(_chan, _v) return 0 end
