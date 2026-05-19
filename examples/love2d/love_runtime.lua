@@ -27,26 +27,26 @@ end
 
 local _update = nil
 local _draw = nil
-function _set_update(fn) print("_set_update called"); _update = fn end
-function _set_draw(fn) print("_set_draw called"); _draw = fn end
+function _set_update(fn) _update = fn end
+function _set_draw(fn) _draw = fn end
 
 function love.load()
   love.graphics.setFont(love.graphics.newFont(14))
-  print("love.load called, _update=" .. tostring(_update) .. " _draw=" .. tostring(_draw))
 end
 
 function love.update(dt)
-  if _update then
-    local ok, err = pcall(_update, dt)
-    if not ok then print("update error: " .. tostring(err)) end
-  else print("no _update") end
+  if _update then _update(dt) end
 end
 
 function love.draw()
-  if _draw then
-    local ok, err = pcall(_draw)
-    if not ok then print("draw error: " .. tostring(err)) end
-  else print("no _draw") end
+  -- Always draw something so we know the game loop runs
+  love.graphics.clear(0.2, 0.3, 0.5)
+  love.graphics.setColor(1, 1, 1)
+  love.graphics.print("LÖVE2D + OCaml FFI", 10, 10)
+  love.graphics.setColor(0, 1, 0)
+  love.graphics.rectangle("fill", 100, 100, 50, 50)
+  -- Then call OCaml draw if registered
+  if _draw then _draw() end
 end
 
 function love.keypressed(key)
