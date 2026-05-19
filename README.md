@@ -66,7 +66,7 @@ Architecture
             IR (Code.program)
               lua_of_ocaml code generator  (generate_lua.ml)
                 Lua AST
-                  lua_output.ml
+                  output_lua.ml
                     .lua text
                       + runtime/lua/*.lua  (Lua primitives)
                         lua hello.lua
@@ -79,7 +79,7 @@ Files
 -----
 
     compiler/lib/lua.ml            Lua 5.1 AST
-    compiler/lib/lua_output.ml     Lua pretty printer
+    compiler/lib/output_lua.ml     Lua pretty printer
     compiler/lib/generate_lua.ml   Code generator (IR -> Lua)
     compiler/bin-lua_of_ocaml/     CLI entry point
     runtime/lua/*.lua              Lua runtime (split files)

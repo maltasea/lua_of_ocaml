@@ -3,7 +3,7 @@
 open Js_of_ocaml_compiler.Stdlib
 module Parse_bytecode = Js_of_ocaml_compiler.Parse_bytecode
 module Generate_lua = Lua_of_ocaml_compiler.Generate_lua
-module Lua_output = Lua_of_ocaml_compiler.Lua_output
+module Output_lua = Lua_of_ocaml_compiler.Output_lua
 
 let () =
   Sys.catch_break true;
@@ -38,7 +38,7 @@ let write_output ~runtime:_ ~source_file oc lua_prog =
   Js_of_ocaml_compiler.Pretty_print.string fmt
     (Printf.sprintf "--# source: %s\n" source_file);
   Js_of_ocaml_compiler.Pretty_print.string fmt (load_runtime ());
-  Lua_output.program fmt lua_prog;
+  Output_lua.program fmt lua_prog;
   Js_of_ocaml_compiler.Pretty_print.string fmt "_main()\n"
 
 let run input_file output_file =
