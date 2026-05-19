@@ -120,6 +120,7 @@ caml_sys_const_max_wosize = function() return 0 end
 caml_sys_const_ostype_cygwin = function() return 0 end
 caml_sys_const_ostype_unix = function() return 2 end
 caml_sys_const_ostype_win = function() return 0 end
+caml_sys_const_ostype_win32 = function() return 0 end
 caml_sys_const_word_size = function() return 0 end
 caml_sys_convert_signal_number = function(_) return 0 end
 caml_sys_getenv_opt = function(_) return 0 end
@@ -156,3 +157,15 @@ caml_lazy_make_forward = function(_) return 0 end
 caml_lazy_reset_to_lazy = function(_) return 0 end
 caml_lazy_update_to_forcing = function(_) return 0 end
 caml_lazy_update_to_forward = function(_) return 0 end
+
+-- Auto-stub: undefined caml_* calls return 0 instead of crashing
+local _gm = getmetatable(_G) or {}
+local _old_index = _gm.__index
+_gm.__index = function(t, k)
+  if type(k) == "string" and string.match(k, "^caml_") then
+    return function(...) return 0 end
+  end
+  if type(_old_index) == "function" then return _old_index(t, k) end
+  if type(_old_index) == "table" then return _old_index[k] end
+end
+setmetatable(_G, _gm)
