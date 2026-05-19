@@ -1,4 +1,4 @@
-LOO = ../../loo.sh
+LOO = ../loo.sh
 LUA ?= luajit
 LOVE ?= love
 
@@ -14,7 +14,7 @@ main.byte: main.ml liblove_stubs.a
 
 main.lua: main.byte
 	$(LOO) main.byte -o _gen.lua
-	cat ../../runtime/lua/*.lua love_runtime.lua _gen.lua > main.lua
+	cat ../runtime/lua/*.lua love_runtime.lua _gen.lua > main.lua
 	@rm -f love_stubs.o main.cmi main.cmo _gen.lua
 
 run: main.lua conf.lua

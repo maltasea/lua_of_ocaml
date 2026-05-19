@@ -27,8 +27,8 @@ end
 
 local _update = nil
 local _draw = nil
-function _set_update(fn) io.stderr:write("_set_update called\n"); _update = fn end
-function _set_draw(fn) io.stderr:write("_set_draw called\n"); _draw = fn end
+function _set_update(fn) _update = fn end
+function _set_draw(fn) _draw = fn end
 
 function love.load() love.graphics.setFont(love.graphics.newFont(14)) end
 
@@ -50,4 +50,3 @@ function love.keypressed(key)
 end
 
 -- Debug: is _main being called?
-io.stderr:write("main.lua loading, _main type=" .. type(_main) .. "\n")
