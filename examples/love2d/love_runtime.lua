@@ -1,24 +1,31 @@
 -- LÖVE2D FFI wrappers for lua_of_ocaml
--- Each function here is callable from OCaml via external declarations.
+
+-- OCaml values in Lua: ints are tagged (n*2), floats are {253, value},
+-- strings are plain Lua strings, blocks are {tag, ...}
+local function ocaml_val(v)
+  if type(v) == "number" then return v / 2 end        -- tagged int
+  if type(v) == "table" and v[1] == 253 then return v[2] or 0 end  -- float
+  return v                                              -- string, etc
+end
 
 function lg_print(text, x, y)
-  love.graphics.print(text, x, y)
+  love.graphics.print(text, ocaml_val(x), ocaml_val(y))
 end
 
 function lg_rectangle(mode, x, y, w, h)
-  love.graphics.rectangle(mode, x, y, w, h)
+  love.graphics.rectangle(mode, ocaml_val(x), ocaml_val(y), ocaml_val(w), ocaml_val(h))
 end
 
 function lg_set_color(r, g, b, a)
-  love.graphics.setColor(r, g, b, a or 1)
+  love.graphics.setColor(ocaml_val(r), ocaml_val(g), ocaml_val(b), ocaml_val(a or 1))
 end
 
 function lg_get_width()
-  return love.graphics.getWidth()
+  return love.graphics.getWidth() * 2
 end
 
 function lg_get_height()
-  return love.graphics.getHeight()
+  return love.graphics.getHeight() * 2
 end
 
 function lk_is_down(key)
@@ -34,14 +41,13 @@ function le_quit()
 end
 
 function lg_clear(r, g, b, a)
-  love.graphics.clear(r, g, b, a or 1)
+  love.graphics.clear(ocaml_val(r), ocaml_val(g), ocaml_val(b), ocaml_val(a or 1))
 end
 
 function lg_set_font(size)
-  love.graphics.setFont(love.graphics.newFont(size))
+  love.graphics.setFont(love.graphics.newFont(ocaml_val(size)))
 end
 
--- Stored callbacks, called from OCaml at init time
 local _update = nil
 local _draw = nil
 
@@ -56,9 +62,7 @@ function love.draw()
   if _draw then _draw() end
 end
 
-function love.load()
-  -- OCaml _main() sets up callbacks via _set_update/_set_draw
-end
+function love.load() end
 
 function love.keypressed(key)
   if key == "escape" then love.event.quit() end
