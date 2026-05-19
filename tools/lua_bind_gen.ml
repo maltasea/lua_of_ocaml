@@ -118,53 +118,55 @@ let () =
   let oc = open_out ocaml_file in
   Printf.fprintf oc "(* Auto-generated from %s *)\n\n" (Filename.basename header);
   let written = ref 0 in
-  List.iter (fun (ret, name, params_str) ->
-    try
-      let params =
-        if params_str = "void" || params_str = "" then []
-        else List.filter (fun s -> s <> "")
-               (Str.split (Str.regexp ",") params_str)
-      in
-      let params = List.map (fun p ->
-          let p = String.trim p in
-          let parts = List.rev (Str.split (Str.regexp "[ \t]+") p) in
-          match parts with
-          | pname :: type_parts ->
-              (ocaml_type (String.concat " " (List.rev type_parts)), clean_param pname)
-          | _ -> ("int", "x")) params
-      in
-      let lua_name = snake_name name in
-      let sig_ = String.concat " -> " (List.map fst params @ [ocaml_type ret]) in
-      Printf.fprintf oc "external %s : %s = \"%s\"\n" lua_name sig_ lua_name;
-      Hashtbl.add ocaml_params lua_name params;
-      Hashtbl.add ocaml_results lua_name (ocaml_type ret);
-      incr written
-    with _ -> Printf.eprintf "SKIP %s\n" name);
+  let process_one (ret, name, params_str) =
+    let params =
+      if params_str = "void" || params_str = "" then []
+      else List.filter (fun s -> s <> "")
+             (Str.split (Str.regexp ",") params_str)
+    in
+    let params = List.map (fun p ->
+        let p = String.trim p in
+        let parts = List.rev (Str.split (Str.regexp "[ \t]+") p) in
+        match parts with
+        | pname :: type_parts ->
+            (ocaml_type (String.concat " " (List.rev type_parts)), clean_param pname)
+        | _ -> ("int", "x")) params
+    in
+    let lua_name = snake_name name in
+    let sig_ = String.concat " -> " (List.map fst params @ [ocaml_type ret]) in
+    Printf.fprintf oc "external %s : %s = \"%s\"\n" lua_name sig_ lua_name;
+    Hashtbl.add ocaml_params lua_name params;
+    Hashtbl.add ocaml_results lua_name (ocaml_type ret);
+    incr written
+  in
+  List.iter process_one decls;
   close_out oc;
-  Printf.printf "Wrote %s (%d externals)\n" ocaml_file !written;
+  Printf.printf "Wrote %s (decls=%d written=%d)\n" ocaml_file (List.length decls) !written;
 
   (* --- C stubs --- *)
   let c_file = base ^ "_stubs.c" in
   let c = open_out c_file in
   Printf.fprintf c "/* Auto-generated from %s */\n" (Filename.basename header);
   Printf.fprintf c "#include <caml/mlvalues.h>\n";
-  List.iter (fun (_ret, name, _params_str) ->
-      let lua_name = snake_name name in
-      let params = try Hashtbl.find ocaml_params lua_name with Not_found -> [] in
-      Printf.fprintf c "CAMLprim value %s(" lua_name;
-      let n = List.length params in
-      for i = 1 to n do
-        Printf.fprintf c "value v%d%s" i (if i < n then "," else "");
-      done;
-      Printf.fprintf c ") {";
-      for i = 1 to n do Printf.fprintf c "(void)v%d;" i done;
-      let ret = try Hashtbl.find ocaml_results lua_name with Not_found -> "unit" in
-      (match ret with
-       | "unit" -> Printf.fprintf c " return Val_unit;"
-       | "int"  -> Printf.fprintf c " return Val_int(0);"
-       | "bool" -> Printf.fprintf c " return Val_bool(0);"
-       | _      -> Printf.fprintf c " return Val_int(0);");
-      Printf.fprintf c " }\n");
+  let write_stub (_ret, name, _params_str) =
+    let lua_name = snake_name name in
+    let params = try Hashtbl.find ocaml_params lua_name with Not_found -> [] in
+    Printf.fprintf c "CAMLprim value %s(" lua_name;
+    let n = List.length params in
+    for i = 1 to n do
+      Printf.fprintf c "value v%d%s" i (if i < n then "," else "");
+    done;
+    Printf.fprintf c ") {";
+    for i = 1 to n do Printf.fprintf c "(void)v%d;" i done;
+    let ret = try Hashtbl.find ocaml_results lua_name with Not_found -> "unit" in
+    (match ret with
+     | "unit" -> Printf.fprintf c " return Val_unit;"
+     | "int"  -> Printf.fprintf c " return Val_int(0);"
+     | "bool" -> Printf.fprintf c " return Val_bool(0);"
+     | _      -> Printf.fprintf c " return Val_int(0);");
+    Printf.fprintf c " }\n"
+  in
+  List.iter write_stub decls;
   close_out c;
   Printf.printf "Wrote %s\n" c_file;
 
@@ -174,8 +176,10 @@ let () =
   Printf.fprintf l "-- Auto-generated from %s\n" (Filename.basename header);
   Printf.fprintf l "local ffi = require(\"ffi\")\n\n";
   Printf.fprintf l "ffi.cdef([[\n";
-  List.iter (fun (ret, name, params_str) ->
-      Printf.fprintf l "  %s %s(%s);\n" ret name params_str) decls;
+  let write_cdef (ret, name, params_str) =
+    Printf.fprintf l "  %s %s(%s);\n" ret name params_str
+  in
+  List.iter write_cdef decls;
   Printf.fprintf l "]])\n\nlocal C = ffi.C\n\n";
 
   Printf.fprintf l "local function ocaml_int(v)\n  if type(v) == \"number\" then return math.floor(v / 2) end\n  return v or 0\nend\n\n";
@@ -183,27 +187,28 @@ let () =
   Printf.fprintf l "local function ocaml_string(v) return v end\n\n";
 
   Printf.fprintf l "-- Wrappers (OCaml external -> C call with value conversion)\n";
-  List.iter (fun (_ret, name, _params_str) ->
-      let lua_name = snake_name name in
-      let params = try Hashtbl.find ocaml_params lua_name with Not_found -> [] in
-      let n = List.length params in
-      if n = 0 then
-        Printf.fprintf l "function %s() return C.%s() end\n" lua_name name
-      else (
-        Printf.fprintf l "function %s(" lua_name;
-        for i = 1 to n do Printf.fprintf l "a%d%s" i (if i < n then "," else ""); done;
-        Printf.fprintf l ")\n  return C.%s(" name;
-        for i = 1 to n do
-          let ctype, _ = List.nth params (i-1) in
-          (match ctype with
-           | "int" | "bool" -> Printf.fprintf l "ocaml_int(a%d)" i
-           | "float" | "double" -> Printf.fprintf l "ocaml_float(a%d)" i
-           | "string" -> Printf.fprintf l "ocaml_string(a%d)" i
-           | _ -> Printf.fprintf l "a%d" i);
-          if i < n then Printf.fprintf l ", ";
-        done;
-        Printf.fprintf l ")\nend\n");
-      Printf.fprintf l "\n") decls;
-
+  let write_wrapper (_ret, name, _params_str) =
+    let lua_name = snake_name name in
+    let params = try Hashtbl.find ocaml_params lua_name with Not_found -> [] in
+    let n = List.length params in
+    if n = 0 then
+      Printf.fprintf l "function %s() return C.%s() end\n" lua_name name
+    else (
+      Printf.fprintf l "function %s(" lua_name;
+      for i = 1 to n do Printf.fprintf l "a%d%s" i (if i < n then "," else ""); done;
+      Printf.fprintf l ")\n  return C.%s(" name;
+      for i = 1 to n do
+        let ctype, _ = List.nth params (i-1) in
+        (match ctype with
+         | "int" | "bool" -> Printf.fprintf l "ocaml_int(a%d)" i
+         | "float" | "double" -> Printf.fprintf l "ocaml_float(a%d)" i
+         | "string" -> Printf.fprintf l "ocaml_string(a%d)" i
+         | _ -> Printf.fprintf l "a%d" i);
+        if i < n then Printf.fprintf l ", ";
+      done;
+      Printf.fprintf l ")\nend\n");
+    Printf.fprintf l "\n"
+  in
+  List.iter write_wrapper decls;
   close_out l;
   Printf.printf "Wrote %s\n" lua_file

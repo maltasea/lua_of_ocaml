@@ -13,3 +13,4 @@ _gen.lua
 examples/love2d/main.lua
 *.o
 *.a
+raylib_*
