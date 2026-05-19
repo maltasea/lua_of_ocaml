@@ -1,4 +1,4 @@
-LUA ?= lua
+LUA ?= luajit
 
 .PHONY: build test clean hello run help
 
