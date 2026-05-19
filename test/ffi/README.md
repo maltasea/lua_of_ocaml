@@ -3,8 +3,8 @@ FFI Tests — OCaml ↔ Lua interop
 The Compiler Bridge
 -------------------
 OCaml bytecode "Extern" primitives become direct Lua function calls.
-Any Lua global function in the runtime is callable from OCaml code
-that compiles to an Extern primitive.  For example:
+Any Lua global function available when the generated program runs is callable
+from OCaml code that compiles to an Extern primitive.  For example:
 
   OCaml source              IR primitive          Generated Lua
   -----------------------   -------------------   ------------------
@@ -17,4 +17,8 @@ caml_global_data for Lua code to call back.
 
 Tests
 -----
-  make test    — run the Lua-side FFI tests (17 assertions)
+  make roundtrip  — compile roundtrip.ml, translate it to Lua, preload
+                    external_impl.lua, and verify OCaml external calls
+                    reach user-provided Lua functions
+  make runtime    — run Lua-side runtime FFI smoke tests
+  make test       — run both

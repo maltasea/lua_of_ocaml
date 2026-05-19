@@ -37,6 +37,12 @@ lua_test() {
   ok
 }
 
+ffi_roundtrip() {
+  say "ffi/roundtrip"
+  ${MAKE:-make} -C test/ffi roundtrip LUA="$LUA" >/dev/null 2>&1 || { fail "roundtrip"; return 1; }
+  ok
+}
+
 echo "=== Compiler Tests ==="
 build() { dune build 2>/dev/null; }; build
 compile_test "smoke/hello"        "smoke/hello.ml"
@@ -64,7 +70,8 @@ lua_test "runtime/string" "test/runtime/string_test.lua"
 lua_test "runtime/obj"    "test/runtime/obj_test.lua"
 
 echo "=== FFI Tests ==="
-lua_test "ffi/ffi" "test/ffi/ffi_test.lua"
+ffi_roundtrip
+lua_test "ffi/runtime" "test/ffi/ffi_test.lua"
 
 echo "=== Source Tracing ==="
 say "source header present"

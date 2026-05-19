@@ -54,6 +54,29 @@ function lua_greet(name)
 end
 os_date = os.date
 
+function caml_atomic_load(obj)
+  return obj[2] or 0
+end
+
+function caml_atomic_store(obj, val)
+  obj[2] = val
+  return 0
+end
+
+function caml_atomic_exchange(obj, new_val)
+  local old = obj[2] or 0
+  obj[2] = new_val
+  return old
+end
+
+function caml_atomic_cas(obj, old_val, new_val)
+  if obj[2] == old_val then
+    obj[2] = new_val
+    return true
+  end
+  return false
+end
+
 function caml_atomic_load_field(obj, field_idx)
   local pos = math_floor(field_idx / 2) + 2
   return obj[pos] or 0
@@ -61,8 +84,8 @@ end
 
 function caml_atomic_cas_field(obj, field_idx, old_val, new_val, _success)
   local pos = math_floor(field_idx / 2) + 2
-  if obj[pos] == old_val then obj[pos] = new_val; return 2 end
-  return 0
+  if obj[pos] == old_val then obj[pos] = new_val; return true end
+  return false
 end
 
 function caml_atomic_exchange_field(obj, field_idx, new_val)
@@ -78,5 +101,4 @@ function caml_atomic_set_field(obj, field_idx, val)
   local pos = math_floor(field_idx / 2) + 2; obj[pos] = val; return 0
 end
 
-caml_atomic_load = caml_atomic_load_field
-caml_atomic_cas = caml_atomic_cas_field
+caml_atomic_set = caml_atomic_store

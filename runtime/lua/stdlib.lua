@@ -1,10 +1,14 @@
 -- lua_of_ocaml runtime: standard library (globals, call support)
 -- Provides: caml_register_global caml_register_named_value caml_get_global
 --           caml_fresh_oo_id caml_call_gen caml_set_global caml_bind_frame
+--           caml_equal caml_notequal
 
 local math_floor = math.floor
 
 caml_global_data = {}
+
+function caml_equal(a, b) return a == b end
+function caml_notequal(a, b) return a ~= b end
 
 function caml_register_global(id, name, v)
   caml_global_data[id + 1] = v
