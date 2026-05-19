@@ -31,6 +31,7 @@ end
 function caml_int64_float_of_bits(_) return 0 end
 function caml_int64_bits_of_float(_) return 0 end
 
+function caml_sys_executable_name(_) return "" end
 function caml_sys_exit(code) os.exit(math_floor(code / 2)) end
 function caml_sys_open(_path, _flags, _perm) return 0 end
 
