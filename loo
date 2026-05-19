@@ -1,11 +1,12 @@
 #!/bin/sh
-# lua_of_ocaml wrapper — no install needed
-# Usage: ./loo file.byte           writes to stdout
-#        ./loo file.byte -o out    writes to out.lua (adds .lua if missing)
+# loo — OCaml to Lua compiler
+# Usage: ./loo hello.ml              # prints Lua to stdout
+#        ./loo hello.ml -o hello.lua # writes hello.lua
 
 set -e
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 OUT=""
+IN=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -14,10 +15,19 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-[ -n "$IN" ] || { echo "Usage: loo <file.byte> [-o output]"; exit 1; }
-[ -n "$OUT" ] || OUT="${IN%.byte}.lua"
-case "$OUT" in *.lua) ;; *) OUT="$OUT.lua";; esac
+[ -n "$IN" ] || { echo "Usage: loo <input.ml> [-o output.lua]"; exit 1; }
 
 cd "$ROOT"
-dune exec --root="$ROOT" -- compiler/bin-lua_of_ocaml/main.exe -- "$IN" -o "$OUT"
-echo "$OUT"
+TMP="$ROOT/_loo_tmp"
+mkdir -p "$TMP"
+BYTE="$TMP/_in.byte"
+
+ocamlc -g -o "$BYTE" "$IN"
+dune exec --root="$ROOT" -- compiler/bin-lua_of_ocaml/main.exe -- "$BYTE" -o "$TMP/_out.lua" 2>&1
+
+if [ -n "$OUT" ]; then
+  mv "$TMP/_out.lua" "$OUT"
+else
+  cat "$TMP/_out.lua"
+fi
+rm -rf "$TMP"
