@@ -2,12 +2,12 @@ LUA ?= luajit
 
 .PHONY: build test clean hello run help
 
-build: loo
+build: loo.sh
 	dune build
 
-loo: misc/loo.in
-	sed "s|@ROOT@|$(shell pwd)|" misc/loo.in > loo
-	chmod +x loo
+loo.sh: misc/loo.in
+	sed "s|@ROOT@|$(shell pwd)|" misc/loo.in > loo.sh
+	chmod +x loo.sh
 
 test:
 	LUA=$(LUA) bash test/run_all.sh
@@ -15,16 +15,14 @@ test:
 clean:
 	dune clean
 	rm -rf test/_out
-	rm -f hello*
+	rm -f hello* loo.sh
 	find . -name '*.byte' -o -name '*.cmi' -o -name '*.cmo' -o -name '*.cma' | xargs rm -f
 
 hello.ml:
 	@echo 'let () = print_endline "hello from lua"' > hello.ml
 
 hello: build hello.ml
-	ocamlc -g -o hello.byte hello.ml
-	dune exec -- compiler/bin-lua_of_ocaml/main.exe -- hello.byte -o hello.lua
-	@rm -f hello.byte hello.cmi hello.cmo
+	./loo.sh hello.ml -o hello.lua
 	$(LUA) hello.lua
 
 run: build
@@ -38,5 +36,5 @@ help:
 	@echo "  make hello            compile and run hello.ml"
 	@echo "  make clean            remove build artifacts"
 	@echo ""
-	@echo "  ./loo file.byte        compile to Lua (no install needed)"
-	@echo "  ./loo file.byte -o out  compile to out.lua"
+	@echo "  ./loo.sh prog.ml            .ml or .byte -> Lua"
+	@echo "  ./loo.sh prog.ml -o out.lua write to file"
