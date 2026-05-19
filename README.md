@@ -48,6 +48,49 @@ with `-g` to include debug info:
 
     ocamlc -g -o hello.byte hello.ml
 
+FFI: calling Lua from OCaml
+-------------------------
+
+OCaml `external` declarations become direct Lua function calls after
+compilation. A dummy C stub is needed only so ocamlc can link:
+
+    (* mylib.ml *)
+    external lua_fn : int -> int -> int = "lua_fn"
+
+    /* mylib_stubs.c — empty, just for linking */
+    #include <caml/mlvalues.h>
+    CAMLprim value lua_fn(value a, value b) { (void)a; (void)b; return Val_int(0); }
+
+Build:
+
+    ocamlc -c mylib_stubs.c                     # → mylib_stubs.o
+    ocamlc -c mylib.ml                          # → mylib.cmo
+    ocamlc -custom -o mylib.byte mylib_stubs.o mylib.cmo
+    ./loo.sh mylib.byte -o mylib.lua
+
+The generated Lua calls `lua_fn(...)` directly. The C code is only
+compiled and linked — it is never executed. The same mechanism as
+js_of_ocaml's `libjs_of_ocaml_stubs.a`.
+
+Defining the Lua side
+---------------------
+
+Add functions to `runtime/lua/misc.lua` (or any `.lua` file loaded
+before the generated code). They become callable from OCaml via
+`external`:
+
+    -- in runtime/lua/misc.lua:
+    function lua_fn(a, b)
+      -- a, b are tagged OCaml ints (value * 2)
+      return a + b
+    end
+
+OCaml values in Lua: integers are tagged (`n*2`), floats are boxed
+(`{253, value}`), strings are plain Lua strings, blocks are
+`{tag, field1, field2, ...}`.
+
+Examples: `examples/love2d/` — a LÖVE2D platformer using OCaml → Lua FFI.
+
 Tests
 -----
 
