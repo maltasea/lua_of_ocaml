@@ -1,12 +1,13 @@
 LUA ?= luajit
+PREFIX ?= /usr/local
 
-.PHONY: build test clean hello run help
+.PHONY: build test clean hello run install help
 
 build: loo.sh
 	dune build
 
 loo.sh: misc/loo.in
-	sed "s|@ROOT@|$(shell pwd)|" misc/loo.in > loo.sh
+	sed -e "s|@ROOT@|$(shell pwd)|" -e "s|@RUNTIME@|$(shell pwd)/runtime/lua|" misc/loo.in > loo.sh
 	chmod +x loo.sh
 
 test:
@@ -25,6 +26,14 @@ hello: build hello.ml
 	./loo.sh hello.ml -o hello.lua
 	$(LUA) hello.lua
 
+install: build
+	install -d $(PREFIX)/bin $(PREFIX)/share/lua_of_ocaml/runtime/lua
+	sed -e "s|@ROOT@|$(PREFIX)/share/lua_of_ocaml|" \
+	    -e "s|@RUNTIME@|$(PREFIX)/share/lua_of_ocaml/runtime/lua|" \
+	    misc/loo.in > $(PREFIX)/bin/loo
+	chmod +x $(PREFIX)/bin/loo
+	cp runtime/lua/*.lua $(PREFIX)/share/lua_of_ocaml/runtime/lua/
+
 run: build
 	dune exec -- compiler/bin-lua_of_ocaml/main.exe -- $(FILE)
 
@@ -34,6 +43,7 @@ help:
 	@echo "  make                  build the compiler"
 	@echo "  make test             run test suite"
 	@echo "  make hello            compile and run hello.ml"
+	@echo "  make install          install to $$PREFIX ($(PREFIX))"
 	@echo "  make clean            remove build artifacts"
 	@echo ""
 	@echo "  ./loo.sh prog.ml            .ml or .byte -> Lua"
