@@ -4,8 +4,11 @@ LOVE ?= love
 
 .PHONY: run clean
 
-main.byte: main.ml love_stubs.c
+liblove_stubs.a: love_stubs.c
 	ocamlc -c love_stubs.c
+	ar rcs liblove_stubs.a love_stubs.o
+
+main.byte: main.ml liblove_stubs.a
 	ocamlc -c main.ml
 	ocamlc -custom -o main.byte love_stubs.o main.cmo
 
@@ -18,4 +21,4 @@ run: main.lua conf.lua
 	$(LOVE) .
 
 clean:
-	rm -f main.lua main.byte _gen.lua *.cmi *.cmo *.o
+	rm -f main.lua main.byte _gen.lua *.cmi *.cmo *.o *.a *.cma

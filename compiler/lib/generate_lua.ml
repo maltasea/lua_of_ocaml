@@ -174,11 +174,12 @@ and compile_closure blocks entry_pc =
        | Code.Return _ | Code.Raise _ | Code.Stop -> ());
        ()) blocks () in
 
-  (* For each block with >1 predecessor, compile as a local function *)
+  (* Skip merge-block precompilation for large CFGs (avoids OOM) *)
   let merge_blocks = ref Code.Addr.Set.empty in
-  let _ = Code.Addr.Map.fold (fun pc n () ->
-      if n > 1 then merge_blocks := Code.Addr.Set.add pc !merge_blocks;
-      ()) !pred_counts () in
+  (if Code.Addr.Map.cardinal blocks < 500 then
+     let _ = Code.Addr.Map.fold (fun pc n () ->
+         if n > 1 then merge_blocks := Code.Addr.Set.add pc !merge_blocks;
+         ()) !pred_counts () in ());
 
   let merge_name pc = Printf.sprintf "_m%d" (pc :> int) in
 
@@ -203,10 +204,8 @@ and compile_closure blocks entry_pc =
                     :: !merge_defs)
   in
 
-  (* Compile merge blocks first (they're called from branch targets) *)
   let _ = Code.Addr.Set.fold (fun pc () -> compile_merge pc; ()) !merge_blocks () in
 
-  (* Compile the main body starting from entry_pc *)
   let body = compile_branch ~fall_through:None structure dom visited_blocks
                blocks merge_blocks None (entry_pc, []) [] in
 
