@@ -5,16 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>loo — lua_of_ocaml</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
     background: #1a1c2c;
     color: #c4ccd4;
-    font-family: 'Press Start 2P', monospace;
-    font-size: 11px;
-    line-height: 2.2;
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 20px;
+    line-height: 1.6;
     background-image:
       linear-gradient(45deg, #1e2040 25%, transparent 25%),
       linear-gradient(-45deg, #1e2040 25%, transparent 25%),
@@ -32,12 +32,28 @@
     image-rendering: pixelated;
   }
   .banner img {
-    width: 160px;
-    height: 160px;
+    width: 180px;
+    height: 180px;
     object-fit: cover;
     border: 4px solid #5a8cbf;
     image-rendering: pixelated;
     box-shadow: 8px 8px 0 #151520;
+    background: #252840;
+    display: block;
+    margin: 0 auto;
+  }
+  .banner .img-fallback {
+    width: 180px;
+    height: 180px;
+    margin: 0 auto;
+    border: 4px solid #5a8cbf;
+    background: #252840;
+    box-shadow: 8px 8px 0 #151520;
+    font-size: 4em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    image-rendering: pixelated;
   }
   .banner h1 {
     font-size: 1.4em;
@@ -63,7 +79,8 @@
   }
 
   h2 {
-    font-size: 0.8em;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.7em;
     color: #dfa060;
     margin: 30px 0 10px;
     padding: 6px 10px;
@@ -71,7 +88,8 @@
     border-left: 4px solid #dfa060;
   }
   h3 {
-    font-size: 0.65em;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.5em;
     color: #8ab0c0;
     margin: 18px 0 6px;
   }
@@ -82,13 +100,13 @@
     padding: 12px 16px;
     overflow-x: auto;
     font-family: 'Courier New', monospace;
-    font-size: 11px;
+    font-size: 0.8em;
     color: #80c080;
     line-height: 1.7;
   }
   code {
     font-family: 'Courier New', monospace;
-    font-size: 11px;
+    font-size: 0.9em;
     color: #c0a060;
   }
   pre code { color: #80c080; }
@@ -99,7 +117,6 @@
     margin: 10px 0;
     background: #1e2030;
     color: #8898a8;
-    font-size: 0.7em;
   }
 
   a { color: #dfa060; text-decoration: none; }
@@ -111,7 +128,6 @@
     padding: 10px 14px;
     margin: 14px 0;
     color: #80a080;
-    font-size: 0.65em;
   }
 
   .arch {
@@ -120,7 +136,7 @@
     padding: 14px 18px;
     margin: 6px 0;
     font-family: 'Courier New', monospace;
-    font-size: 10px;
+    font-size: 0.8em;
     line-height: 2.2;
     color: #8898a8;
     overflow-x: auto;
@@ -130,7 +146,7 @@
     width: 100%;
     border-collapse: collapse;
     margin: 10px 0;
-    font-size: 0.65em;
+    font-size: 0.8em;
   }
   th, td {
     border: 2px solid #303550;
@@ -140,7 +156,8 @@
   th {
     background: #252840;
     color: #dfa060;
-    font-size: 0.75em;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.55em;
   }
   td { color: #8898a8; }
 
@@ -148,7 +165,7 @@
     text-align: center;
     padding: 20px;
     color: #4a5060;
-    font-size: 0.55em;
+    font-size: 0.7em;
     border-top: 4px solid #252840;
     margin-top: 30px;
   }
@@ -171,7 +188,7 @@
 <body>
 
 <div class="banner">
-  <img src="misc/loo.jpg" alt="loo" onerror="this.style.display='none'">
+  <img src="misc/loo.jpg" alt="loo chicken" onerror="this.parentNode.insertBefore(Object.assign(document.createElement('div'),{className:'img-fallback',textContent:'🐔'}), this); this.remove()">
   <h1>lua_of_ocaml</h1>
   <p class="sub">ocaml &gt;&gt; lua 5.1</p>
   <p class="tagline">chicken jump forever</p>
