@@ -6,7 +6,7 @@ LOVE ?= love
 
 main.byte: main.ml love_stubs.c
 	ocamlc -c love_stubs.c
-	ocamlc -c main.ml 2>/dev/null || true
+	ocamlc -c main.ml
 	ocamlc -custom -o main.byte love_stubs.o main.cmo
 
 main.lua: main.byte

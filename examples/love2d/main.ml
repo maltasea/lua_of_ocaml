@@ -13,7 +13,7 @@ external _set_update  : (float -> unit) -> unit = "_set_update"
 external _set_draw    : (unit -> unit) -> unit = "_set_draw"
 
 (* ---- Game state ---- *)
-type player = { x : int; mutable y : int; mutable vy : int }
+type player = { mutable x : int; mutable y : int; mutable vy : int }
 
 let p = { x = 280; y = 200; vy = 0 }
 
