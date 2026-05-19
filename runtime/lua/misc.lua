@@ -111,3 +111,48 @@ function caml_atomic_set_field(obj, field_idx, val)
 end
 
 caml_atomic_set = caml_atomic_store
+
+-- Batch stubs for stdlib initialization
+caml_sys_const_backend_type = 0
+caml_sys_const_big_endian = 0
+caml_sys_const_int_size = 0
+caml_sys_const_max_wosize = 0
+caml_sys_const_ostype_cygwin = 0
+caml_sys_const_ostype_unix = 2
+caml_sys_const_ostype_win = 0
+caml_sys_const_word_size = 0
+caml_sys_convert_signal_number = function(_) return 0 end
+caml_sys_getenv_opt = function(_) return 0 end
+caml_sys_io_buffer_size = function() return 0 end
+caml_sys_rev_convert_signal_number = function(_) return 0 end
+caml_install_signal_handler = function(_, _) return 0 end
+caml_ml_enable_runtime_warnings = function(_) return 0 end
+caml_ml_runtime_warnings_enabled = function() return 0 end
+caml_atomic_fetch_add_field = function(_, _, _) return 0 end
+caml_atomic_make_contended = function(_) return 0 end
+caml_compare = function(_, _) return 0 end
+caml_array_append = function(_, _) return {0} end
+caml_array_blit = function(_, _, _, _, _, _) return 0 end
+caml_array_concat = function(_) return {0} end
+caml_array_fill = function(_, _, _, _) return 0 end
+caml_array_make = function(_, _) return {0} end
+caml_array_sub = function(_, _, _) return {0} end
+caml_floatarray_get = function(_, _) return 0 end
+caml_floatarray_set = function(_, _, _) return 0 end
+caml_ephe_create = function(_, _) return {0} end
+caml_ephe_blit_data = function(_, _, _, _, _, _) return 0 end
+caml_ephe_blit_key = function(_, _, _, _, _, _) return 0 end
+caml_ephe_check_data = function(_, _) return 0 end
+caml_ephe_check_key = function(_, _) return 0 end
+caml_ephe_get_data = function(_, _) return {0} end
+caml_ephe_get_data_copy = function(_, _) return {0} end
+caml_ephe_get_key = function(_, _) return {0} end
+caml_ephe_get_key_copy = function(_, _) return {0} end
+caml_ephe_set_data = function(_, _, _) return 0 end
+caml_ephe_set_key = function(_, _, _) return 0 end
+caml_ephe_unset_data = function(_, _, _) return 0 end
+caml_ephe_unset_key = function(_, _, _) return 0 end
+caml_lazy_make_forward = function(_) return 0 end
+caml_lazy_reset_to_lazy = function(_) return 0 end
+caml_lazy_update_to_forcing = function(_) return 0 end
+caml_lazy_update_to_forward = function(_) return 0 end
