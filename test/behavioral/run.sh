@@ -67,13 +67,17 @@ compare "bools"        "bools.ml"
 compare "arrays"       "arrays.ml"
 compare "floats"       "floats.ml"
 compare "structural_eq" "structural_eq.ml"
+compare "bytes_loop"   "bytes_loop.ml"
+compare "options"      "options.ml"
+compare "higher_order" "higher_order.ml"
+compare "buffer"       "buffer.ml"
+compare "printf_single" "printf_single.ml"
 
 echo ""
 echo "=== Known-Broken Regressions ==="
-# probe_string_mut: for-loop over Bytes; post-loop print_newline is lost
-# because merge-block precompilation is gated off at >=500 blocks. Tracked
-# in memory.md task #12.
-xfail_compare "bytes_loop" "bytes_loop.ml"
+# Multi-placeholder Printf: closures capture IR vars as globals, so chained
+# format processing reads stale captures.  Single-placeholder works.
+xfail_compare "printf_multi" "printf_multi.ml"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed, $XFAIL xfail, $XPASS xpass ==="

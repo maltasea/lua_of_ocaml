@@ -1,7 +1,5 @@
-(* Regression for memory.md task #12:
-   merge-block precompilation is gated at <500 blocks, so the post-loop
-   `print_newline ()` here is lost on the loop-exit path.  Stays as
-   XFAIL until the codegen limitation is fixed. *)
+(* Bytes mutation + for-loop length.  Regression for the codegen issue
+   where post-loop code was lost when the CFG had many blocks. *)
 let () =
   let b = Bytes.make 5 'x' in
   Bytes.set b 2 'Y';

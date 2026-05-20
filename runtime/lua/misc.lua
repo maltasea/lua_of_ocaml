@@ -162,19 +162,21 @@ end
 
 caml_atomic_set = caml_atomic_store
 
--- Batch stubs for stdlib initialization
-caml_sys_const_backend_type = function() return 0 end
-caml_sys_const_big_endian = function() return 0 end
-caml_sys_const_int_size = function() return 0 end
-caml_sys_const_max_wosize = function() return 0 end
+-- Sys.* constants.  Returned values must be OCaml-encoded ints (2*n).
+-- These feed real arithmetic (e.g. max_string_length depends on word_size),
+-- so wrong values silently corrupt downstream computation.
+caml_sys_const_backend_type = function() return {0, "Other", "lua_of_ocaml"} end
+caml_sys_const_big_endian = function() return 0 end                -- false
+caml_sys_const_int_size = function() return 126 end                -- encoded 63
+caml_sys_const_max_wosize = function() return 2 * (2^22 - 1) end   -- ~jsoo's value
 caml_sys_const_ostype_cygwin = function() return 0 end
-caml_sys_const_ostype_unix = function() return 2 end
+caml_sys_const_ostype_unix = function() return 2 end               -- true
 caml_sys_const_ostype_win = function() return 0 end
 caml_sys_const_ostype_win32 = function() return 0 end
-caml_sys_const_word_size = function() return 0 end
+caml_sys_const_word_size = function() return 128 end               -- encoded 64
 caml_sys_convert_signal_number = function(_) return 0 end
 caml_sys_getenv_opt = function(_) return 0 end
-caml_sys_io_buffer_size = function() return 0 end
+caml_sys_io_buffer_size = function() return 131072 end             -- encoded 65536
 caml_sys_rev_convert_signal_number = function(_) return 0 end
 caml_install_signal_handler = function(_, _) return 0 end
 caml_ml_enable_runtime_warnings = function(_) return 0 end

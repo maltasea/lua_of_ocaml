@@ -86,27 +86,52 @@ function caml_bind_frame(f)
   end
 end
 
+-- Arity table: maps closure functions to their declared parameter count.
+-- Weak keys so closures can be GC'd.
+caml_arity = setmetatable({}, { __mode = "k" })
+
+function caml_mkclosure(n, f)
+  caml_arity[f] = n
+  return f
+end
+
+-- Handles partial / exact / over-application correctly for OCaml-curried
+-- semantics.  When arity is unknown (e.g. host Lua function from FFI), we
+-- conservatively apply one argument at a time, which works because OCaml
+-- types every function as unary externally.
 function caml_call_gen(f, ...)
-  local arity = f.arity or 0
+  local arity = caml_arity[f]
   local nargs = select("#", ...)
+  if arity == nil then
+    -- Unknown arity (likely a Lua-side FFI function or a Lua function
+    -- without arity info): apply one arg at a time.
+    local args = { ... }
+    local r = f
+    for i = 1, nargs do r = r(args[i]) end
+    return r
+  end
   if arity == nargs then
     return f(...)
   elseif arity < nargs then
+    -- Over-application: call f with its declared arity, then apply rest.
     local args = { ... }
     local r = f(unpack(args, 1, arity))
-    for i = arity + 1, nargs do r = r(args[i]) end
+    for i = arity + 1, nargs do r = caml_call_gen(r, args[i]) end
     return r
   else
-    local args = { ... }
-    return function(...)
+    -- Under-application: build a closure that captures these args and
+    -- waits for the rest.  Arity decreases by nargs.
+    local saved = { ... }
+    local rem = arity - nargs
+    local partial = function(...)
+      local more = { ... }
+      local mn = select("#", ...)
       local all = {}
-      for i = 1, nargs do all[i] = args[i] end
-      for i = 1, select("#", ...) do all[nargs + i] = select(i, ...) end
-      if #all >= arity then
-        return caml_call_gen(f, unpack(all, 1, arity))
-      else
-        return caml_call_gen(f, unpack(all))
-      end
+      for i = 1, nargs do all[i] = saved[i] end
+      for i = 1, mn do all[nargs + i] = more[i] end
+      return f(unpack(all, 1, nargs + mn))
     end
+    caml_arity[partial] = rem
+    return partial
   end
 end

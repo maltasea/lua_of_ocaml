@@ -69,8 +69,13 @@ type edge_kind = Loop | Exit_loop | Forward
 (* ---- Constant translation ---- *)
 
 let rec translate_expr blocks = function
-  | Code.Apply { f; args; _ } ->
+  | Code.Apply { f; args; exact = true } ->
       L.call (evar f) (List.map ~f:evar args)
+  | Code.Apply { f; args; exact = false } ->
+      (* Inexact apply (arity unknown at compile time): route through
+         caml_call_gen so partial/over-application work correctly. *)
+      L.call (L.EVar (L.ident "caml_call_gen"))
+        (evar f :: List.map ~f:evar args)
   | Code.Block (tag, fields, _, _) ->
       make_block (L.int_ tag) (Array.to_list (Array.map ~f:evar fields))
   | Code.Field (x, n, _) -> block_field (evar x) n
@@ -86,7 +91,9 @@ let rec translate_expr blocks = function
             L.Comment (Printf.sprintf "# %s:%d" file pi.line) :: body
         | None -> body
       in
-      L.EFun (params', body, false)
+      (* Wrap with arity tracking so caml_call_gen can curry correctly. *)
+      L.call (L.EVar (L.ident "caml_mkclosure"))
+        [L.int_ (List.length params'); L.EFun (params', body, false)]
   | Code.Constant c -> translate_constant c
   | Code.Prim (p, args) -> translate_prim p args
   | Code.Special (Code.Alias_prim name) ->
@@ -175,35 +182,36 @@ and compile_closure blocks entry_pc =
   let dom = Structure.dominator_tree structure in
   let visited_blocks = ref Code.Addr.Set.empty in
 
-  (* Collect predecessor counts to identify merge nodes *)
-  let pred_counts = ref Code.Addr.Map.empty in
-  let incr_pred pc =
-    pred_counts := Code.Addr.Map.update pc (fun n ->
-        Some (Option.value ~default:0 n + 1)) !pred_counts
-  in
-  let _ = Code.Addr.Map.fold (fun _pc block () ->
-      let add_target = function
-        | pc' -> incr_pred pc'
-      in
-      (match get_branch block with
-       | Code.Branch (pc', _) -> add_target pc'
-       | Code.Cond (_, (pc1, _), (pc2, _)) -> add_target pc1; add_target pc2
-       | Code.Switch (_, cases) -> Array.iter ~f:(fun (pc', _) -> add_target pc') cases
-       | Code.Pushtrap ((pc_h, _), _, (pc_c, _)) -> add_target pc_h; add_target pc_c
-       | Code.Poptrap (pc, _) -> add_target pc
-       | Code.Return _ | Code.Raise _ | Code.Stop -> ());
-       ()) blocks () in
-
-  (* Precompile merge blocks (>1 predecessor) as functions, but only for
-     small CFGs — the recursive inlining inside each merge's body blows up
-     superlinearly on big programs and can hang the compiler.  Merge funcs
-     are emitted as global assignments so the 200-locals-per-function limit
+  (* Precompile merge blocks (≥2 incoming edges in *this* closure's
+     subgraph) as functions.  Structure.is_merge_node counts unique
+     predecessors (a set), so OR-patterns where one Switch sends multiple
+     cases to the same block aren't detected as merges — we need a multi-
+     edge count so those shared bodies get precompiled into a callable
+     `_m<pc>`.  Restricting to the closure's reachable nodes avoids the
+     bloat where every nested closure re-emitted every global merge.
+     Merge funcs are assigned to globals so Lua 5.1's 200-locals limit
      never bites. *)
+  let reachable = Structure.get_nodes structure in
+  let edge_in = ref Code.Addr.Map.empty in
+  let incr_in pc' =
+    edge_in :=
+      Code.Addr.Map.update pc'
+        (fun n -> Some (Option.value ~default:0 n + 1))
+        !edge_in
+  in
+  Code.Addr.Set.iter (fun pc ->
+      let block = Code.Addr.Map.find pc blocks in
+      match get_branch block with
+      | Code.Branch (pc', _) -> incr_in pc'
+      | Code.Cond (_, (p1, _), (p2, _)) -> incr_in p1; incr_in p2
+      | Code.Switch (_, cases) -> Array.iter ~f:(fun (p, _) -> incr_in p) cases
+      | Code.Pushtrap ((p1, _), _, (p2, _)) -> incr_in p1; incr_in p2
+      | Code.Poptrap (p, _) -> incr_in p
+      | Code.Return _ | Code.Raise _ | Code.Stop -> ()) reachable;
   let merge_blocks = ref Code.Addr.Set.empty in
-  (if Code.Addr.Map.cardinal blocks < 500 then
-     let _ = Code.Addr.Map.fold (fun pc n () ->
-         if n > 1 then merge_blocks := Code.Addr.Set.add pc !merge_blocks;
-         ()) !pred_counts () in ());
+  Code.Addr.Map.iter (fun pc n ->
+      if n > 1 && Code.Addr.Set.mem pc reachable
+      then merge_blocks := Code.Addr.Set.add pc !merge_blocks) !edge_in;
 
   let merge_name pc = Printf.sprintf "_m%d" (pc :> int) in
 
