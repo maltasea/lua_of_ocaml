@@ -72,12 +72,7 @@ compare "options"      "options.ml"
 compare "higher_order" "higher_order.ml"
 compare "buffer"       "buffer.ml"
 compare "printf_single" "printf_single.ml"
-
-echo ""
-echo "=== Known-Broken Regressions ==="
-# Multi-placeholder Printf: closures capture IR vars as globals, so chained
-# format processing reads stale captures.  Single-placeholder works.
-xfail_compare "printf_multi" "printf_multi.ml"
+compare "printf_multi" "printf_multi.ml"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed, $XFAIL xfail, $XPASS xpass ==="

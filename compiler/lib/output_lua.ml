@@ -66,7 +66,12 @@ and expression f e =
   | L.ETable fields -> table_constructor f fields
   | L.EFun (params, body, _variadic) -> function_literal f params body
   | L.ECall (fn, args) ->
-      expression f fn;
+      (* Lua's parser bails on `function(...) ... end(...)` because the
+         `function` keyword opens a statement; wrap function/inline-call
+         callees in parens. *)
+      (match fn with
+       | L.EFun _ | L.ECall _ -> paren_expression f fn
+       | _ -> expression f fn);
       PP.string f "(";
       comma_list f expression args;
       PP.string f ")"

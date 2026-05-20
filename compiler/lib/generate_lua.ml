@@ -68,6 +68,13 @@ type edge_kind = Loop | Exit_loop | Forward
 
 (* ---- Constant translation ---- *)
 
+(* When true, Code.Let inside translate_instr emits a Lua `local` rather
+   than a global assignment.  Set to true while compiling inner closure
+   bodies and back to false for the top-level _main wrapper — the top
+   level has thousands of Lets and would blow Lua 5.1's 200-locals limit
+   if we used locals there. *)
+let emit_locals = ref false
+
 let rec translate_expr blocks = function
   | Code.Apply { f; args; exact = true } ->
       L.call (evar f) (List.map ~f:evar args)
@@ -81,7 +88,13 @@ let rec translate_expr blocks = function
   | Code.Field (x, n, _) -> block_field (evar x) n
   | Code.Closure (params, (pc, _), cloc) ->
       let params' = List.map params ~f:ident_of_var in
+      (* Inside this closure we want Code.Let to emit `local` so each
+         invocation gets its own bindings — otherwise recursive calls
+         overwrite each other's vars (the Printf bug). *)
+      let prev_emit_locals = !emit_locals in
+      emit_locals := true;
       let body = compile_closure blocks pc in
+      emit_locals := prev_emit_locals;
       let body = match cloc with
         | Some pi ->
             let file = match pi.src with
@@ -91,7 +104,6 @@ let rec translate_expr blocks = function
             L.Comment (Printf.sprintf "# %s:%d" file pi.line) :: body
         | None -> body
       in
-      (* Wrap with arity tracking so caml_call_gen can curry correctly. *)
       L.call (L.EVar (L.ident "caml_mkclosure"))
         [L.int_ (List.length params'); L.EFun (params', body, false)]
   | Code.Constant c -> translate_constant c
@@ -151,7 +163,16 @@ and translate_prim p args =
 (* ---- Translate instructions ---- *)
 
 and translate_instr blocks = function
-  | Code.Let (x, e) -> [L.Assign ([evar x], [translate_expr blocks e])]
+  | Code.Let (x, e) ->
+      let rhs = translate_expr blocks e in
+      if !emit_locals
+      then
+        (* Declare local FIRST, then assign — so a self-referential
+           closure body that captures x as upvalue sees the local slot
+           (which Lua updates after assignment), not whatever the global
+           x happens to hold. *)
+        [L.Local ([ident_of_var x], []); L.Assign ([evar x], [rhs])]
+      else [L.Assign ([evar x], [rhs])]
   | Code.Assign (x, y) -> [L.Assign ([evar x], [evar y])]
   | Code.Set_field (x, n, _, y) ->
       [L.Assign ([block_field (evar x) n], [evar y])]
