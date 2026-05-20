@@ -14,6 +14,24 @@ end
 function caml_string_get(s, i)
   return string.byte(s, math_floor(i/2) + 1) * 2
 end
+caml_string_unsafe_get = caml_string_get
+
+-- Bytes get/set.  Bytes are { str } — mutate the str slot in place.
+function caml_bytes_get(b, i)
+  local s = type(b) == "table" and b[1] or b
+  return string.byte(s, math_floor(i/2) + 1) * 2
+end
+caml_bytes_unsafe_get = caml_bytes_get
+
+function caml_bytes_set(b, i, c)
+  local s = type(b) == "table" and b[1] or b
+  local pos = math_floor(i/2) + 1
+  local ch = string.char(math_floor(c/2) % 256)
+  local r = string.sub(s, 1, pos - 1) .. ch .. string.sub(s, pos + 1)
+  if type(b) == "table" then b[1] = r end
+  return 0
+end
+caml_bytes_unsafe_set = caml_bytes_set
 
 function caml_create_string(len)
   return string.rep("\0", math_floor(len/2))
@@ -61,6 +79,11 @@ end
 
 function caml_string_notequal(a, b) return a ~= b end
 function caml_string_equal(a, b) return a == b end
+function caml_bytes_equal(a, b)
+  local sa = type(a) == "table" and a[1] or a
+  local sb = type(b) == "table" and b[1] or b
+  return sa == sb
+end
 
 function caml_string_compare(a, b)
   if a < b then return -2 elseif a > b then return 2 else return 0 end

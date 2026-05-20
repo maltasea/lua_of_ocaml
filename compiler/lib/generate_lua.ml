@@ -135,11 +135,12 @@ and translate_instr blocks = function
   | Code.Set_field (x, n, _, y) ->
       [L.Assign ([block_field (evar x) n], [evar y])]
   | Code.Offset_ref (x, n) ->
+      (* OCaml ints are encoded as 2*v, so incrementing by n must add 2*n. *)
       let f = block_field (evar x) 0 in
       let rhs = match n with
-        | 0 -> f | 1 -> L.bin L.Add f one | -1 -> L.bin L.Sub f one
-        | n when n < 0 -> L.bin L.Sub f (L.int_ (-n))
-        | _ -> L.bin L.Add f (L.int_ n)
+        | 0 -> f
+        | n when n < 0 -> L.bin L.Sub f (L.int_ (-2 * n))
+        | _ -> L.bin L.Add f (L.int_ (2 * n))
       in
       [L.Assign ([block_field (evar x) 0], [rhs])]
   | Code.Array_set (x, y, z) ->
@@ -179,7 +180,11 @@ and compile_closure blocks entry_pc =
        | Code.Return _ | Code.Raise _ | Code.Stop -> ());
        ()) blocks () in
 
-  (* Skip merge-block precompilation for large CFGs (avoids OOM) *)
+  (* Precompile merge blocks (>1 predecessor) as functions, but only for
+     small CFGs — the recursive inlining inside each merge's body blows up
+     superlinearly on big programs and can hang the compiler.  Merge funcs
+     are emitted as global assignments so the 200-locals-per-function limit
+     never bites. *)
   let merge_blocks = ref Code.Addr.Set.empty in
   (if Code.Addr.Map.cardinal blocks < 500 then
      let _ = Code.Addr.Map.fold (fun pc n () ->
@@ -203,7 +208,7 @@ and compile_closure blocks entry_pc =
         @ compile_conditional ~fall_through:None structure dom visited_blocks
             blocks merge_blocks (Some pc) [] (get_branch block)
       in
-      merge_decls := L.Local ([L.ident (merge_name pc)], []) :: !merge_decls;
+      (* Globals: no `local` declaration; just assign. *)
       merge_defs := L.Assign ([L.EVar (L.ident (merge_name pc))],
                                [L.fun_ (List.map ~f:ident_of_var (get_params block)) body])
                     :: !merge_defs)
@@ -252,9 +257,23 @@ and compile_branch ~fall_through structure dom visited_blocks
         let args' = List.map ~f:evar args in
         [L.Return [L.call (L.EVar (L.ident (Printf.sprintf "_m%d" (pc :> int)))) args']]
     | None ->
-        (* Block not in scope, compile it inline *)
-        compile_block ~fall_through structure dom visited_blocks
-          blocks merge_blocks parent_block pc scope_stack
+        (* Block not in scope.  Bind the target block's formal params to the
+           args passed by this branch BEFORE the body, then either inline it
+           (first visit) or — if already visited — break out of the enclosing
+           loop so control reaches the post-loop code. *)
+        let target_params = (Code.Addr.Map.find pc blocks).params in
+        let arg_binds = bind_args target_params args in
+        let already_visited = Code.Addr.Set.mem pc !visited_blocks in
+        let in_loop =
+          List.exists scope_stack ~f:(fun (_, k) ->
+              match k with Loop -> true | _ -> false)
+        in
+        if already_visited && in_loop then
+          arg_binds @ [L.Break]
+        else
+          arg_binds
+          @ compile_block ~fall_through structure dom visited_blocks
+              blocks merge_blocks parent_block pc scope_stack
 
 (* ---- Block: loop detection ---- *)
 
@@ -327,13 +346,16 @@ and compile_conditional ~fall_through structure dom visited_blocks
       [L.If (cond, body1, [], Some body2)]
 
   | Code.Switch (x, cases) ->
+      (* Switch input is OCaml-encoded: int variants are 2*i, block tags come
+         from %direct_obj_tag which we also return as 2*tag (see misc.lua).
+         So all case indices i compare against 2*i. *)
       let n = Array.length cases in
       let rec build i =
         if i >= n then []
         else
           let (pc', args') = cases.(i) in
           let body = branch ~fall_through pc' args' in
-          let cond = L.bin L.Eq (evar x) (L.int_ i) in
+          let cond = L.bin L.Eq (evar x) (L.int_ (2 * i)) in
           L.If (cond, body, [], None) :: build (i + 1)
       in
       build 0
