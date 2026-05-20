@@ -7,7 +7,9 @@ build: loo.sh
 	dune build
 
 loo.sh: misc/loo.in
-	sed -e "s|@ROOT@|$(shell pwd)|" -e "s|@RUNTIME@|$(shell pwd)/runtime/lua|" misc/loo.in > loo.sh
+	sed -e "s|@LOO_BIN@|$(shell pwd)/_build/default/compiler/bin-lua_of_ocaml/main.exe|" \
+	    -e "s|@RUNTIME@|$(shell pwd)/runtime/lua|" \
+	    misc/loo.in > loo.sh
 	chmod +x loo.sh
 
 test:
@@ -28,7 +30,9 @@ hello: build hello.ml
 
 install: build
 	install -d $(PREFIX)/bin $(PREFIX)/share/lua_of_ocaml/runtime/lua
-	sed -e "s|@ROOT@|$(PREFIX)/share/lua_of_ocaml|" \
+	install -m 0755 _build/default/compiler/bin-lua_of_ocaml/main.exe \
+	    $(PREFIX)/bin/lua_of_ocaml
+	sed -e "s|@LOO_BIN@|$(PREFIX)/bin/lua_of_ocaml|" \
 	    -e "s|@RUNTIME@|$(PREFIX)/share/lua_of_ocaml/runtime/lua|" \
 	    misc/loo.in > $(PREFIX)/bin/loo
 	chmod +x $(PREFIX)/bin/loo
