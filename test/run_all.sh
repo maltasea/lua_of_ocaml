@@ -3,6 +3,9 @@
 set -e
 cd "$(dirname "$0")/.."
 LUA=${LUA:-lua}
+# Strict mode by default: undefined caml_* fail loudly instead of returning 0.
+# Set LOO_STRICT=0 explicitly to disable.
+export LOO_STRICT=${LOO_STRICT:-1}
 TMP=test/_out; rm -rf $TMP; mkdir -p $TMP
 PASS=0; FAIL=0
 

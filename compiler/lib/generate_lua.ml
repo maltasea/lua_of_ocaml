@@ -7,6 +7,16 @@ module Code = Js_of_ocaml_compiler.Code
 module Targetint = Js_of_ocaml_compiler.Targetint
 module Structure = Js_of_ocaml_compiler.Structure
 
+(* ---- Unsupported-feature tracking ----
+   Int64 and Float_array currently lower to placeholders (0 / empty block).
+   Track how many we emit so the CLI can warn the user. *)
+let unsupported_int64_count = ref 0
+let unsupported_float_array_count = ref 0
+
+let reset_unsupported_counts () =
+  unsupported_int64_count := 0;
+  unsupported_float_array_count := 0
+
 (* ---- Variable naming ---- *)
 
 let lua_safe_name s =
@@ -101,8 +111,12 @@ and translate_constant = function
   | Code.Tuple (tag, fields, _) ->
       let fields = Array.to_list (Array.map fields ~f:translate_constant) in
       make_block (L.int_ tag) fields
-  | Code.Float_array _ -> make_block (L.int_ 253) [L.int_ 0]
-  | Code.Int64 _ -> L.int_ 0
+  | Code.Float_array _ ->
+      incr unsupported_float_array_count;
+      make_block (L.int_ 253) [L.int_ 0]
+  | Code.Int64 _ ->
+      incr unsupported_int64_count;
+      L.int_ 0
 
 and translate_prim p args =
   let pa a = match a with Code.Pv v -> evar v | Code.Pc c -> translate_constant c in

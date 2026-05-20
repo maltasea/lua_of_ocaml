@@ -68,8 +68,9 @@ let write_output ~runtime_dir ~source_file oc lua_prog =
   Output_lua.program fmt lua_prog;
   Js_of_ocaml_compiler.Pretty_print.string fmt "_main()\n"
 
-let run ~runtime_dir input_file output_file =
+let run ~runtime_dir ~strict_unsupported input_file output_file =
   let ic = open_in_bin input_file in
+  Generate_lua.reset_unsupported_counts ();
   let compile_and_emit code =
     let lua_prog = Generate_lua.compile_program code in
     let oc = match output_file with
@@ -92,22 +93,44 @@ let run ~runtime_dir input_file output_file =
    | `Cma lib ->
        let parsed = Parse_bytecode.from_cma ~debug:true lib ic in
        close_in ic;
-       compile_and_emit parsed.Parse_bytecode.code)
+       compile_and_emit parsed.Parse_bytecode.code);
+  let i64 = !Generate_lua.unsupported_int64_count in
+  let fa  = !Generate_lua.unsupported_float_array_count in
+  if i64 > 0 || fa > 0 then begin
+    let parts = List.filter ~f:(fun (n, _) -> n > 0)
+        [ i64, "Int64 constants"
+        ; fa,  "Float_array constants"
+        ] in
+    let msg = String.concat ~sep:", "
+        (List.map parts ~f:(fun (n, k) -> Printf.sprintf "%d %s" n k)) in
+    if strict_unsupported then begin
+      Printf.eprintf "ERROR: %s used; --strict-unsupported is set\n" msg;
+      exit 1
+    end else
+      Printf.eprintf
+        "WARN: %s lowered to placeholders (0 / empty block) — programs that\n\
+        \      actually use these values will compute wrong results silently.\n\
+        \      Pass --strict-unsupported to fail instead.\n" msg
+  end
 
 let () =
   let input_file = ref None in
   let output_file = ref None in
   let runtime_override = ref None in
+  let strict_unsupported = ref false in
   let args = List.tl (Array.to_list Sys.argv) in
   let rec parse_args = function
     | [] -> ()
     | "-o" :: f :: rest -> output_file := Some f; parse_args rest
     | ("--runtime" | "-runtime") :: d :: rest ->
         runtime_override := Some d; parse_args rest
+    | "--strict-unsupported" :: rest ->
+        strict_unsupported := true; parse_args rest
     | "--help" :: _ | "-h" :: _ ->
         print_endline "Usage: lua_of_ocaml [options] <bytecode_file>";
-        print_endline "  -o <file>       Output file (default: stdout)";
-        print_endline "  --runtime <dir> Path to runtime/lua directory";
+        print_endline "  -o <file>             Output file (default: stdout)";
+        print_endline "  --runtime <dir>       Path to runtime/lua directory";
+        print_endline "  --strict-unsupported  Fail (don't warn) on Int64/Float_array";
         print_endline "  Env LOO_RUNTIME overrides the search path.";
         exit 0
     | f :: rest when String.length f > 0 && Char.equal f.[0] '-' ->
@@ -125,8 +148,9 @@ let () =
   match !input_file with
   | None ->
       Printf.eprintf "Usage: lua_of_ocaml [options] <bytecode_file>\n";
-      Printf.eprintf "  -o <file>       Output file (default: stdout)\n";
-      Printf.eprintf "  --runtime <dir> Path to runtime/lua directory\n";
+      Printf.eprintf "  -o <file>             Output file (default: stdout)\n";
+      Printf.eprintf "  --runtime <dir>       Path to runtime/lua directory\n";
+      Printf.eprintf "  --strict-unsupported  Fail (don't warn) on Int64/Float_array\n";
       exit 1
   | Some f ->
-      run ~runtime_dir f !output_file
+      run ~runtime_dir ~strict_unsupported:!strict_unsupported f !output_file
