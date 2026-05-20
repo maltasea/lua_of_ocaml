@@ -1,7 +1,7 @@
 LUA ?= luajit
 PREFIX ?= /usr/local
 
-.PHONY: build test clean hello run install help
+.PHONY: build test clean hello run install help html
 
 build: loo.sh
 	dune build
@@ -16,7 +16,7 @@ test:
 clean:
 	dune clean
 	rm -rf test/_out
-	rm -f hello* loo.sh
+	rm -f hello* loo.sh index.html style.css
 	find . -name '*.byte' -o -name '*.cmi' -o -name '*.cmo' -o -name '*.cma' | xargs rm -f
 
 hello.ml:
@@ -33,6 +33,11 @@ install: build
 	    misc/loo.in > $(PREFIX)/bin/loo
 	chmod +x $(PREFIX)/bin/loo
 	cp runtime/lua/*.lua $(PREFIX)/share/lua_of_ocaml/runtime/lua/
+
+html: README.md
+	rm -f style.css
+	cp ~/work/site_template/style.css style.css
+	pandoc README.md --standalone --metadata title="loo — lua_of_ocaml" --toc --css=style.css -o index.html
 
 run: build
 	dune exec -- compiler/bin-lua_of_ocaml/main.exe -- $(FILE)
