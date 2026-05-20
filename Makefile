@@ -1,7 +1,7 @@
 LUA ?= luajit
 PREFIX ?= /usr/local
 
-.PHONY: build test clean hello run install help html
+.PHONY: build test clean hello run install help html prim-inventory
 
 build: loo.sh
 	dune build
@@ -46,12 +46,16 @@ html: README.md
 run: build
 	dune exec -- compiler/bin-lua_of_ocaml/main.exe -- $(FILE)
 
+prim-inventory: build
+	@./misc/prim_inventory.sh
+
 help:
 	@echo "lua_of_ocaml - OCaml to Lua 5.1 compiler"
 	@echo ""
 	@echo "  make                  build the compiler"
 	@echo "  make test             run test suite"
 	@echo "  make hello            compile and run hello.ml"
+	@echo "  make prim-inventory   audit primitive coverage in generated Lua"
 	@echo "  make install          install to $$PREFIX ($(PREFIX))"
 	@echo "  make clean            remove build artifacts"
 	@echo ""

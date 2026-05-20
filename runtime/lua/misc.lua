@@ -185,6 +185,95 @@ caml_atomic_fetch_add_field = function(_, _, _) return 0 end
 caml_atomic_make_contended = function(_) return 0 end
 -- caml_compare provided by stdlib.lua (structural)
 -- caml_array_* provided by array.lua
+
+-- Integer compare and hashing (operate on already-encoded ints).
+function caml_int_compare(a, b)
+  if a < b then return -2 elseif a > b then return 2 else return 0 end
+end
+caml_int32_compare = caml_int_compare
+caml_nativeint_compare = caml_int_compare
+
+function caml_string_hash(seed, s)
+  -- Simple multiplicative hash; OCaml's caml_string_hash is more elaborate
+  -- but a stable, well-distributed hash is enough for hashtables.
+  local h = math_floor((seed or 0) / 2)
+  for i = 1, #s do
+    h = ((h * 31) + string.byte(s, i)) % 2147483648
+  end
+  return h * 2
+end
+function caml_hash(_count, _limit, seed, x)
+  if type(x) == "string" then return caml_string_hash(seed, x) end
+  if type(x) == "number" then return x end          -- already encoded
+  if type(x) == "table" then
+    local h = math_floor((seed or 0) / 2)
+    for i = 1, #x do
+      local v = x[i]
+      if type(v) == "number" then h = (h * 31 + math_floor(v / 2)) % 2147483648 end
+    end
+    return h * 2
+  end
+  return 0
+end
+
+-- Byte-swap helpers (encoded ints in, encoded ints out).
+local function _bswap16(n)
+  return ((n % 256) * 256) + math_floor(n / 256)
+end
+local function _bswap32(n)
+  local b0 = n % 256;       n = math_floor(n / 256)
+  local b1 = n % 256;       n = math_floor(n / 256)
+  local b2 = n % 256;       local b3 = math_floor(n / 256)
+  return ((b0 * 16777216) + (b1 * 65536) + (b2 * 256) + b3) % 4294967296
+end
+function caml_bswap16(n)     return _bswap16(math_floor(n / 2)) * 2 end
+function caml_int32_bswap(n) return _bswap32(math_floor(n / 2)) * 2 end
+function caml_nativeint_bswap(n) return caml_int32_bswap(n) end
+function caml_int64_bswap(n) return n end           -- Int64 is unsupported anyway
+
+-- Integer formatting variants (delegate to caml_format_int).
+caml_int32_format = caml_format_int
+caml_nativeint_format = caml_format_int
+caml_int64_format = function(_fmt, _i) return "0" end
+
+-- Multi-byte string/bytes get/set, used by Bytes.get_int16_*, etc.
+local function _multi_get(s, i, n, signed)
+  local r = 0
+  for k = 0, n - 1 do
+    r = r + string.byte(s, math_floor(i / 2) + 1 + k) * (256 ^ k)
+  end
+  if signed then
+    local sign_bit = 256 ^ n / 2
+    if r >= sign_bit then r = r - 256 ^ n end
+  end
+  return r * 2
+end
+function caml_string_get16(s, i)     return _multi_get(s, i, 2, false) end
+function caml_string_get32(s, i)     return _multi_get(s, i, 4, false) end
+function caml_string_get64(s, i)     return 0 end   -- Int64 unsupported
+function caml_bytes_get16(b, i)
+  local s = type(b) == "table" and b[1] or b
+  return _multi_get(s, i, 2, false)
+end
+function caml_bytes_get32(b, i)
+  local s = type(b) == "table" and b[1] or b
+  return _multi_get(s, i, 4, false)
+end
+function caml_bytes_get64(_b, _i) return 0 end
+local function _multi_set(b, i, n, v)
+  local s = type(b) == "table" and b[1] or b
+  local pos = math_floor(i / 2) + 1
+  v = math_floor(v / 2)
+  local buf = {}
+  for k = 1, n do buf[k] = string.char(v % 256); v = math_floor(v / 256) end
+  local r = string.sub(s, 1, pos - 1) .. table.concat(buf) .. string.sub(s, pos + n)
+  if type(b) == "table" then b[1] = r end
+  return 0
+end
+function caml_bytes_set16(b, i, v) return _multi_set(b, i, 2, v) end
+function caml_bytes_set32(b, i, v) return _multi_set(b, i, 4, v) end
+function caml_bytes_set64(_, _, _) return 0 end
+
 caml_floatarray_get = caml_array_get
 caml_floatarray_set = caml_array_set
 caml_floatarray_unsafe_get = caml_array_unsafe_get

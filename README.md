@@ -81,9 +81,51 @@ The IR from js_of_ocaml is target-agnostic. lua_of_ocaml reuses the bytecode par
     ocamlc -custom -o mylib.byte mylib_stubs.o mylib.cmo
     ./loo.sh mylib.byte -o mylib.lua
 
-ocaml values in lua: ints tagged `n*2`, floats boxed `{253, v}`, strings plain, blocks `{tag, f1, f2, ...}`.
+### value representation contract
 
-real example: [example-game/](example-game/) — löve2d chicken jump.
+The lua-side function receives ocaml values in the encoded form below.
+Return values must use the same encoding or the compiled caller will
+misinterpret them.
+
+| ocaml type | lua representation | notes |
+|---|---|---|
+| `int`        | `n * 2`              | tag bit; recover with `math.floor(v / 2)` |
+| `bool`       | `0` (false), `2` (true) | lua `false`/`true` from externals also accepted in conditionals |
+| `char`       | `code * 2`           | lua byte 0..255, encoded as int |
+| `float`      | `{253, v}`           | boxed; `v` is a plain lua number |
+| `string`     | plain lua string     | immutable |
+| `bytes`      | `{ str }`            | single-cell table; mutate `t[1]` to rebind |
+| `unit`       | `0`                  | same encoding as `()` |
+| `'a list`    | `0` (nil) or `{0, hd, tl}` | tag 0, head, tail |
+| `'a option`  | `0` (None) or `{0, x}` | tag 0 for Some |
+| `'a array`   | `{0, a0, a1, ...}`   | tag 0 then elements |
+| variant `A \| B of int \| ...` | `0`, `2`, ... (no-arg) or `{tag, fields...}` (with args) | const variants are encoded ints; block variants use their tag |
+| record `{f1; f2}` | `{0, v1, v2}`   | tag 0, fields in declaration order |
+| tuple `(a, b)` | `{0, a, b}`        | same shape as a tag-0 record |
+| function `f` | lua function        | `caml_arity[f]` tracks param count for partial application |
+
+When writing the lua side of an `external`, unwrap inputs and box outputs:
+
+```lua
+function lua_add(a, b)
+  -- a, b are encoded ints
+  return a + b              -- tagged + tagged stays tagged; ok
+end
+
+function lua_dist(p_box, q_box)
+  -- floats are boxed
+  local p, q = p_box[2], q_box[2]
+  return { 253, math.sqrt((p - q) * (p - q)) }
+end
+```
+
+OCaml callbacks (e.g. `external _set_update : (float -> unit) -> unit`)
+arrive as lua functions; call them with `caml_call_gen(cb, arg)` so
+partial/over-application matches OCaml's curried semantics.
+
+Real example: [example-game/](example-game/) — löve2d chicken jump.
+`love_runtime.lua` unwraps encoded ints/floats before calling the real
+LÖVE API; that's the canonical reference pattern.
 
 ## source tracing
 
