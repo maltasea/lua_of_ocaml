@@ -34,11 +34,15 @@ compare() {
 }
 
 echo "=== Behavioral Tests ==="
-compare "hello"      "hello.ml"
-compare "arith"      "arith.ml"
-compare "strings"    "strings.ml"
-compare "functions"  "functions.ml"
-compare "comparison" "comparison.ml"
+compare "hello"        "hello.ml"
+compare "arith"        "arith.ml"
+compare "strings"      "strings.ml"
+compare "functions"    "functions.ml"
+compare "comparison"   "comparison.ml"
+compare "bools"        "bools.ml"
+compare "arrays"       "arrays.ml"
+compare "floats"       "floats.ml"
+compare "structural_eq" "structural_eq.ml"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="

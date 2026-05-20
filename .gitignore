@@ -1,4 +1,8 @@
 *.html
+**/memory.txt
+**/memory.md
+**/report*.txt
+**/report*.md
 external/
 *.byte
 report.txt

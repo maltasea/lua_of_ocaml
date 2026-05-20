@@ -111,7 +111,10 @@ and translate_prim p args =
       L.bin L.Mul (L.bin L.Sub (L.EUn (L.Len, pa a)) one) two
   | Code.Array_get, [a; b] ->
       L.access (pa a) (L.bin L.Add (L.bin L.Div (pa b) two) two)
-  | Code.Not, [a] -> L.EUn (L.Not, pa a)
+  | Code.Not, [a] ->
+      (* OCaml bool false = 0 (truthy in Lua), so "not a" gives wrong result.
+         Emit (a == 0 or a == false) — true iff a is OCaml-false or Lua-false. *)
+      L.bin L.Or (L.bin L.Eq (pa a) (L.int_ 0)) (L.bin L.Eq (pa a) (L.EBool false))
   | Code.IsInt, [a] ->
       L.bin L.Eq (L.call (L.EVar (L.ident "type")) [pa a]) (L.string_ "number")
   | Code.Eq, [a; b] -> L.bin L.Eq (pa a) (pa b)
@@ -314,7 +317,14 @@ and compile_conditional ~fall_through structure dom visited_blocks
   | Code.Cond (x, (pc1, args1), (pc2, args2)) ->
       let body1 = branch ~fall_through pc1 args1 in
       let body2 = branch ~fall_through pc2 args2 in
-      [L.If (evar x, body1, [], Some body2)]
+      (* OCaml false is encoded as int 0 (truthy in Lua).  Also accept Lua
+         booleans returned by externals (e.g. love2d lk_is_down). *)
+      let cond =
+        L.bin L.And
+          (L.bin L.Neq (evar x) (L.int_ 0))
+          (L.bin L.Neq (evar x) (L.EBool false))
+      in
+      [L.If (cond, body1, [], Some body2)]
 
   | Code.Switch (x, cases) ->
       let n = Array.length cases in

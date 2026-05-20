@@ -11,9 +11,59 @@ function caml_format_int(fmt, i)
   return string.format(fmt, math_floor(i / 2))
 end
 
-function caml_format_float(fmt, f)
-  if type(f) == "table" then return "0.0" end
-  return string.format(fmt, f)
+-- Floats are boxed as { 253, value }.  Helper to unwrap.
+local function _f(x) if type(x) == "table" then return x[2] or 0 end; return x or 0 end
+local function _bf(v) return { 253, v } end
+
+function caml_format_float(fmt, f) return string.format(fmt, _f(f)) end
+
+function caml_add_float(a, b) return _bf(_f(a) + _f(b)) end
+function caml_sub_float(a, b) return _bf(_f(a) - _f(b)) end
+function caml_mul_float(a, b) return _bf(_f(a) * _f(b)) end
+function caml_div_float(a, b) return _bf(_f(a) / _f(b)) end
+function caml_neg_float(a)    return _bf(-_f(a)) end
+function caml_abs_float(a)    return _bf(math.abs(_f(a))) end
+function caml_sqrt_float(a)   return _bf(math.sqrt(_f(a))) end
+function caml_exp_float(a)    return _bf(math.exp(_f(a))) end
+function caml_log_float(a)    return _bf(math.log(_f(a))) end
+function caml_sin_float(a)    return _bf(math.sin(_f(a))) end
+function caml_cos_float(a)    return _bf(math.cos(_f(a))) end
+function caml_tan_float(a)    return _bf(math.tan(_f(a))) end
+function caml_floor_float(a)  return _bf(math.floor(_f(a))) end
+function caml_ceil_float(a)   return _bf(math.ceil(_f(a))) end
+function caml_power_float(a, b) return _bf(_f(a) ^ _f(b)) end
+function caml_fmod_float(a, b) return _bf(math.fmod(_f(a), _f(b))) end
+
+function caml_eq_float(a, b)  return _f(a) == _f(b) end
+function caml_neq_float(a, b) return _f(a) ~= _f(b) end
+function caml_lt_float(a, b)  return _f(a) <  _f(b) end
+function caml_le_float(a, b)  return _f(a) <= _f(b) end
+function caml_gt_float(a, b)  return _f(a) >  _f(b) end
+function caml_ge_float(a, b)  return _f(a) >= _f(b) end
+caml_float_compare = function(a, b)
+  local x, y = _f(a), _f(b)
+  if x < y then return -2 elseif x > y then return 2 else return 0 end
+end
+
+function caml_float_of_int(i) return _bf(math_floor(i / 2)) end
+function caml_int_of_float(f) return math_floor(_f(f)) * 2 end
+function caml_int_of_float_unboxed(f) return math_floor(_f(f)) * 2 end
+
+function caml_classify_float(f)
+  local v = _f(f)
+  if v ~= v then return 8 end                 -- NaN
+  if v == math.huge or v == -math.huge then return 6 end
+  if v == 0 then return 4 end
+  return 0                                     -- FP_normal
+end
+
+function caml_signbit_float(f) return (_f(f) < 0) and 2 or 0 end
+function caml_float_of_bytes(s) return _bf(tonumber(s) or 0) end
+function caml_hexstring_of_float(_, _, _) return "0x0p+0" end
+function caml_float_of_hexstring(_) return _bf(0) end
+function caml_modf_float(f)
+  local v = _f(f); local i = (v >= 0) and math.floor(v) or math.ceil(v)
+  return { 0, _bf(v - i), _bf(i) }
 end
 
 function caml_int_of_string(s)
@@ -131,15 +181,12 @@ caml_ml_enable_runtime_warnings = function(_) return 0 end
 caml_ml_runtime_warnings_enabled = function() return 0 end
 caml_atomic_fetch_add_field = function(_, _, _) return 0 end
 caml_atomic_make_contended = function(_) return 0 end
-caml_compare = function(_, _) return 0 end
-caml_array_append = function(_, _) return {0} end
-caml_array_blit = function(_, _, _, _, _, _) return 0 end
-caml_array_concat = function(_) return {0} end
-caml_array_fill = function(_, _, _, _) return 0 end
-caml_array_make = function(_, _) return {0} end
-caml_array_sub = function(_, _, _) return {0} end
-caml_floatarray_get = function(_, _) return 0 end
-caml_floatarray_set = function(_, _, _) return 0 end
+-- caml_compare provided by stdlib.lua (structural)
+-- caml_array_* provided by array.lua
+caml_floatarray_get = caml_array_get
+caml_floatarray_set = caml_array_set
+caml_floatarray_unsafe_get = caml_array_unsafe_get
+caml_floatarray_unsafe_set = caml_array_unsafe_set
 caml_ephe_create = function(_, _) return {0} end
 caml_ephe_blit_data = function(_, _, _, _, _, _) return 0 end
 caml_ephe_blit_key = function(_, _, _, _, _, _) return 0 end
@@ -158,14 +205,18 @@ caml_lazy_reset_to_lazy = function(_) return 0 end
 caml_lazy_update_to_forcing = function(_) return 0 end
 caml_lazy_update_to_forward = function(_) return 0 end
 
--- Auto-stub: undefined caml_* calls return 0 instead of crashing
-local _gm = getmetatable(_G) or {}
-local _old_index = _gm.__index
-_gm.__index = function(t, k)
-  if type(k) == "string" and string.match(k, "^caml_") then
-    return function(...) return 0 end
+-- Auto-stub: undefined caml_* calls return 0 instead of crashing.
+-- Gated by LOO_STRICT=1: under strict mode, undefined caml_* throws so
+-- missing primitives surface in tests instead of silently corrupting output.
+if not (os.getenv and os.getenv("LOO_STRICT") == "1") then
+  local _gm = getmetatable(_G) or {}
+  local _old_index = _gm.__index
+  _gm.__index = function(t, k)
+    if type(k) == "string" and string.match(k, "^caml_") then
+      return function(...) return 0 end
+    end
+    if type(_old_index) == "function" then return _old_index(t, k) end
+    if type(_old_index) == "table" then return _old_index[k] end
   end
-  if type(_old_index) == "function" then return _old_index(t, k) end
-  if type(_old_index) == "table" then return _old_index[k] end
+  setmetatable(_G, _gm)
 end
-setmetatable(_G, _gm)

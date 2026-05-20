@@ -68,16 +68,13 @@ function int_neg(a) return -a end
 caml_and = int_and; caml_or = int_or; caml_xor = int_xor
 caml_lsl = int_lsl; caml_lsr = int_lsr; caml_asr = int_asr
 
+-- Monomorphic int comparisons (poly versions live in stdlib.lua).
 function caml_eq(a, b) return a == b end
 function caml_neq(a, b) return a ~= b end
 function caml_lt(a, b) return a < b end
 function caml_le(a, b) return a <= b end
 function caml_gt(a, b) return a > b end
 function caml_ge(a, b) return a >= b end
-function caml_lessequal(a, b) return a <= b end
-function caml_greaterequal(a, b) return a >= b end
-function caml_lessthan(a, b) return a < b end
-function caml_greaterthan(a, b) return a > b end
 
 function caml_not(x) return (x == 0) and 2 or 0 end
 function caml_is_int(x) return type(x) == "number" end
