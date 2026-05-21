@@ -11,6 +11,7 @@ Hardware: M1 mac, no special tuning.
 |---|---:|---:|---:|---|
 | `fib(30)`              | 0.04s   | 0.20s   | **5×**   | non-tail recursion |
 | `sum_array(1M)`        | 0.05s   | 0.04s   | **0.7×** | for-loop + array write/read |
+| `fold_list(200K)`      | 0.02s   | 0.08s   | **4×**   | tail-recursive list build + fold |
 | `string_concat(100K)`  | 0.02s   | 12.59s  | **787×** | Buffer.add_string in a loop |
 | `map_ops(50K)`         | 0.10s   | 3.43s   | **33×**  | Map.Make + closures |
 | `closure_calls(1M)`    | 0.04s   | 0.18s   | **5×**   | higher-order function call |
@@ -42,31 +43,17 @@ trace JIT makes a huge difference on tight numeric loops.)
 
 ## Tail-call notes
 
-OCaml's bytecode compiler emits `TAILCALL` for syntactic tail
-positions; `ocamlrun` honours it. **We don't.** Every `branch ~f x`
-in our codegen is a regular Lua call, consuming a C-stack frame.
-
-LuaJIT's `lua_resume` C stack is ~2000 frames before overflow. So
-any OCaml program that recurses tail-style beyond that depth crashes:
+~~We don't preserve tail calls~~ FIXED. `compile_block_no_loop` now
+peeks at the block's last instruction and branch: when the pattern
+is `Let (x, Apply { f; args; … }); Return x` we emit `return f(args)`
+(or `return caml_call_gen(f, args)` for inexact applies).  Lua 5.1's
+proper tail calls don't grow the C stack, so the canonical OCaml
+tail pattern works through any depth.
 
 ```ocaml
 let rec build acc i = if i = 0 then acc else build (i :: acc) (i - 1)
-let xs = build [] 200_000  (* boom *)
+let xs = build [] 200_000  (* works *)
 ```
-
-`Array.to_list` from the stdlib is also tail-recursive in OCaml; it
-overflows here at the same depth.
-
-This is the single biggest correctness gap. Two ways out:
-
-1. **Trampolining**: every function returns `(continue?, fn, args)`;
-   a top-level driver loop invokes them. Adds overhead to every
-   call but caps stack usage.
-
-2. **Tail-call detection in codegen**: emit `return foo(...)` where
-   the IR shows a tail position. Lua 5.1's "proper tail calls" via
-   `return f(x)` do *not* grow the stack. This is the right answer
-   but requires control-flow analysis in `compile_branch`.
 
 ## What's worth optimising
 

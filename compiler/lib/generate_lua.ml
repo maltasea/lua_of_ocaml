@@ -411,13 +411,40 @@ and compile_block_no_loop ~fall_through structure dom visited_blocks
     visited_blocks := Code.Addr.Set.add pc !visited_blocks;
     let block = Code.Addr.Map.find pc blocks in
 
-    let instr_stmts = List.concat_map ~f:(translate_instr blocks) (get_body block) in
-
-    let branch_stmts = compile_conditional ~fall_through structure dom visited_blocks
-        blocks merge_blocks (Some pc) scope_stack (get_branch block)
+    (* Tail-call optimisation: if the block's last instruction is
+         Let (x, Apply { f; args; … })
+       and its branch is
+         Return x
+       then emit `return f(args)` (or caml_call_gen for inexact) — a
+       Lua proper tail call that doesn't grow the C stack.  This is
+       how OCaml's TAILCALL bytecode opcode gets honoured. *)
+    let body = get_body block in
+    let branch = get_branch block in
+    let rev_body = List.rev body in
+    let tail =
+      match rev_body, branch with
+      | Code.Let (x, Code.Apply { f; args; exact }) :: rest_rev,
+        Code.Return y when Code.Var.equal x y ->
+          Some (List.rev rest_rev, f, args, exact)
+      | _ -> None
     in
-
-    instr_stmts @ branch_stmts
+    match tail with
+    | Some (init_body, f, args, exact) ->
+        let init_stmts = List.concat_map ~f:(translate_instr blocks) init_body in
+        let call =
+          if exact
+          then L.call (evar f) (List.map ~f:evar args)
+          else L.call (L.EVar (L.ident "caml_call_gen"))
+                 (evar f :: List.map ~f:evar args)
+        in
+        init_stmts @ [L.Return [call]]
+    | None ->
+        let instr_stmts = List.concat_map ~f:(translate_instr blocks) body in
+        let branch_stmts =
+          compile_conditional ~fall_through structure dom visited_blocks
+            blocks merge_blocks (Some pc) scope_stack branch
+        in
+        instr_stmts @ branch_stmts
   )
 
 (* ---- Conditional: handle the last instruction of a block ---- *)
