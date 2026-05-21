@@ -164,15 +164,11 @@ and translate_prim p args =
 
 and translate_instr blocks = function
   | Code.Let (x, e) ->
-      let rhs = translate_expr blocks e in
-      if !emit_locals
-      then
-        (* Declare local FIRST, then assign — so a self-referential
-           closure body that captures x as upvalue sees the local slot
-           (which Lua updates after assignment), not whatever the global
-           x happens to hold. *)
-        [L.Local ([ident_of_var x], []); L.Assign ([evar x], [rhs])]
-      else [L.Assign ([evar x], [rhs])]
+      (* `local x` declarations are hoisted to the start of each closure
+         body by compile_closure (so pcall-protected bodies and inner
+         closures write to the surrounding local, not a transient one).
+         Here we just emit the assignment. *)
+      [L.Assign ([evar x], [translate_expr blocks e])]
   | Code.Assign (x, y) -> [L.Assign ([evar x], [evar y])]
   | Code.Set_field (x, n, _, y) ->
       [L.Assign ([block_field (evar x) n], [evar y])]
@@ -186,7 +182,13 @@ and translate_instr blocks = function
       in
       [L.Assign ([block_field (evar x) 0], [rhs])]
   | Code.Array_set (x, y, z) ->
-      [L.Assign ([L.access (evar x) (L.bin L.Add (evar y) one)], [evar z])]
+      (* y is an encoded OCaml int (2*k); the block field index is k+2.
+         The previous formula `y+1` was off (it produced 2k+1) — out of
+         sync with Array_get and caml_array_set. *)
+      [L.Assign
+         ([L.access (evar x)
+             (L.bin L.Add (L.bin L.Div (evar y) two) two)],
+          [evar z])]
   | Code.Event pi ->
       let file = match pi.src with
         | Some f -> Filename.basename f
@@ -202,6 +204,62 @@ and compile_closure blocks entry_pc =
   let structure = Structure.build_graph blocks entry_pc in
   let dom = Structure.dominator_tree structure in
   let visited_blocks = ref Code.Addr.Set.empty in
+  (* Collect Var.t that need to be locals of THIS closure: any var
+     defined by Code.Let or as a block param within the closure's
+     reachable subgraph (excluding nested closures, which run their
+     own scan).  We emit one `local v1, v2, ...` at the closure body's
+     start so that nested scopes (pcall bodies, inner closures) writing
+     to these vars hit the surrounding local rather than a transient. *)
+  let local_decls =
+    if not !emit_locals then []
+    else begin
+      let acc = ref [] in
+      let seen = ref Code.Var.Set.empty in
+      let add v =
+        if not (Code.Var.Set.mem v !seen) then begin
+          seen := Code.Var.Set.add v !seen;
+          acc := v :: !acc
+        end
+      in
+      Code.Addr.Set.iter (fun pc ->
+        let block = Code.Addr.Map.find pc blocks in
+        List.iter ~f:add block.Code.params;
+        List.iter ~f:(fun instr ->
+          match instr with
+          | Code.Let (x, _) -> add x
+          | _ -> ()) block.Code.body;
+        match block.Code.branch with
+        | Code.Pushtrap (_, x, _) -> add x
+        | _ -> ()
+      ) (Structure.get_nodes structure);
+      List.rev !acc
+    end
+  in
+  (* Lua 5.1 caps active locals per function at 200.  Chunk if needed,
+     and fall back to globals once we run out. *)
+  let max_locals = 180 in
+  let local_decls = if List.length local_decls > max_locals
+    then [] (* too many — leave them as globals (regression risk for the
+              closure-capture fix, but better than a hard compile error) *)
+    else local_decls in
+  let hoisted_locals =
+    match local_decls with
+    | [] -> []
+    | _ ->
+        let rec chunk n = function
+          | [] -> []
+          | xs ->
+              let take, rest =
+                let rec aux i acc = function
+                  | [] -> List.rev acc, []
+                  | l when i = 0 -> List.rev acc, l
+                  | h :: t -> aux (i - 1) (h :: acc) t
+                in aux n [] xs
+              in
+              L.Local (List.map ~f:ident_of_var take, []) :: chunk n rest
+        in
+        chunk 50 local_decls
+  in
 
   (* Precompile merge blocks (≥2 incoming edges in *this* closure's
      subgraph) as functions.  Structure.is_merge_node counts unique
@@ -262,7 +320,7 @@ and compile_closure blocks entry_pc =
   let body = compile_branch ~fall_through:None structure dom visited_blocks
                blocks merge_blocks None (entry_pc, []) [] in
 
-  List.rev !merge_decls @ List.rev !merge_defs @ body
+  hoisted_locals @ List.rev !merge_decls @ List.rev !merge_defs @ body
 
 (* ---- Branch: jump to a block ---- *)
 
@@ -404,7 +462,13 @@ and compile_conditional ~fall_through structure dom visited_blocks
       build 0
 
   | Code.Pushtrap ((pc_h, args_h), x, (pc_c, args_c)) ->
-      (* pcall-based try-catch: pc_h=continuation, pc_c=handler (swapped in IR) *)
+      (* pcall-based try-catch.  pc_h = body, x = exception var,
+         pc_c = handler.  Treat Poptrap as a Branch to the join — the
+         body's last statement inside pcall becomes `return _m_join(…)`
+         or the inlined join's `return r`, which propagates through
+         pcall as _res.  After pcall, on success we forward _res as the
+         surrounding function's return value; on failure we run the
+         handler, which itself ends with a branch/return to the join. *)
       let body_c = branch ~fall_through pc_h args_h in
       let body_h = branch ~fall_through pc_c (x :: args_c) in
       let ok_var = L.ident "_ok" in
@@ -413,16 +477,16 @@ and compile_conditional ~fall_through structure dom visited_blocks
                  [L.call (L.EVar (L.ident "pcall"))
                     [L.EFun ([], body_c, false)]])
       ; L.If (L.EVar ok_var,
-              [L.Assign ([evar x], [L.EVar res_var])],
+              [L.Return [L.EVar res_var]],
               [],
               Some (L.Assign ([evar x], [L.EVar (L.ident "_caml_exn")]) :: body_h))
       ]
 
-  | Code.Poptrap _ ->
-      (* After try/catch, x holds the result. Poptrap is implicit in JS/Lua.
-         The corresponding Pushtrap already emitted the try/catch.
-         We just continue to the next block (called by our caller). *)
-      []
+  | Code.Poptrap cont ->
+      (* Treat Poptrap as a Branch — bind join params and inline (or
+         call the merge function for) the join block.  Whatever the
+         join produces becomes this function's return value. *)
+      branch ~fall_through (fst cont) (snd cont)
 
 (* ---- Program compilation ---- *)
 

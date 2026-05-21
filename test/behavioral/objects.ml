@@ -1,8 +1,10 @@
-(* XFAIL: classes and object literals.  Runtime camlinternalOO support
-   (caml_get_public_method, caml_set_oo_id, etc.) is in place, but
-   set_method's Labs.find runs before new_method populates the label
-   map, raising Not_found.  Either narrow/new_method aren't being
-   called or our codegen mishandles the order.  Tracked separately. *)
+(* Classes and object literals.  Real fix turned out to be three
+   things: (1) caml_get_public_method/caml_set_oo_id wired up to match
+   jsoo's obj.js, (2) Code.Pushtrap's pcall body now treats Poptrap as
+   a branch to the join (its return propagates through pcall as _res,
+   then the success branch returns _res), (3) Code.Array_set's index
+   formula was off by 2 — `y+1` instead of `y/2+2` — so instance-
+   variable writes went to the wrong slot. *)
 class counter init = object
   val mutable n = init
   method get = n

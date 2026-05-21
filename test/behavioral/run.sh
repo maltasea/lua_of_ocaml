@@ -78,9 +78,10 @@ compare "modules"      "modules.ml"
 compare "firstclass"   "firstclass.ml"
 compare "gadt"         "gadt.ml"
 
+compare "objects"      "objects.ml"
+
 echo ""
 echo "=== Known-Broken Regressions ==="
-xfail_compare "objects" "objects.ml"
 xfail_compare "effects" "effects.ml"
 
 echo ""
