@@ -12,6 +12,7 @@ _build/
 test/_out/
 *.swp
 *~
+.claude/
 loo.sh
 _install
 _gen.lua
