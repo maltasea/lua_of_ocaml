@@ -14,8 +14,10 @@ jobs:
       fail-fast: false
       matrix:
         ocaml:
-          # Effect handlers test needs OCaml 5.0+; if 4.x support
-          # matters, gate test/behavioral/effects.ml on the version.
+          # 4.14 is the oldest version js_of_ocaml-compiler 6.2 still
+          # supports.  test/behavioral/effects.ml is skipped on 4.x
+          # (the Effect module is 5.0+); everything else runs.
+          - "4.14.x"
           - "5.1.x"
           - "5.2.x"
           - "5.3.x"

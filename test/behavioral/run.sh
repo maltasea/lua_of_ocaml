@@ -6,14 +6,25 @@ cd "$(dirname "$0")/../.."
 LUA=${LUA:-lua}
 # Strict mode by default — see test/run_all.sh.
 export LOO_STRICT=${LOO_STRICT:-1}
-PASS=0; FAIL=0; XFAIL=0; XPASS=0
+PASS=0; FAIL=0; XFAIL=0; XPASS=0; SKIP=0
 TMP=test/_out; rm -rf $TMP; mkdir -p $TMP
+
+# Detect OCaml major.minor for version-gating tests (effect handlers
+# need 5.0+).
+OCAML_VERSION=$(ocamlc -version 2>/dev/null | sed -E 's/^([0-9]+\.[0-9]+).*/\1/')
+ocaml_ge_5() {
+  case "$OCAML_VERSION" in
+    5.*) return 0;;
+    *)   return 1;;
+  esac
+}
 
 say()    { printf "  %-45s" "$1"; }
 ok()     { echo " OK"; PASS=$((PASS+1)); }
 fail()   { echo " FAIL ($1)"; FAIL=$((FAIL+1)); }
 xfail()  { echo " XFAIL (known broken)"; XFAIL=$((XFAIL+1)); }
 xpass()  { echo " XPASS (fixed! flip to compare)"; XPASS=$((XPASS+1)); }
+skip()   { echo " SKIP ($1)"; SKIP=$((SKIP+1)); }
 
 _run_both() {
   local name="$1" src="test/behavioral/$2"
@@ -79,12 +90,16 @@ compare "firstclass"   "firstclass.ml"
 compare "gadt"         "gadt.ml"
 
 compare "objects"      "objects.ml"
-compare "effects"      "effects.ml"
+if ocaml_ge_5; then
+  compare "effects"      "effects.ml"
+else
+  say "effects"; skip "needs OCaml 5+"
+fi
 compare "json"         "json.ml"
 compare "hashtbl"      "hashtbl.ml"
 
 echo ""
-echo "=== Results: $PASS passed, $FAIL failed, $XFAIL xfail, $XPASS xpass ==="
+echo "=== Results: $PASS passed, $FAIL failed, $XFAIL xfail, $XPASS xpass, $SKIP skipped ==="
 if [ "$XPASS" -gt 0 ]; then
   echo "(XPASS = previously known-broken test now passes — flip it to compare.)"
 fi
