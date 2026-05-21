@@ -168,6 +168,20 @@ end
 
 caml_atomic_set = caml_atomic_store
 
+function caml_atomic_fetch_add(obj, n)
+  local old = obj[2] or 0
+  obj[2] = old + n
+  return old
+end
+function caml_atomic_add(obj, n)
+  obj[2] = (obj[2] or 0) + n
+  return 0
+end
+function caml_atomic_sub(obj, n)
+  obj[2] = (obj[2] or 0) - n
+  return 0
+end
+
 -- Sys.* constants.  Returned values must be OCaml-encoded ints (2*n).
 -- These feed real arithmetic (e.g. max_string_length depends on word_size),
 -- so wrong values silently corrupt downstream computation.
@@ -180,6 +194,32 @@ caml_sys_const_ostype_unix = function() return 2 end               -- true
 caml_sys_const_ostype_win = function() return 0 end
 caml_sys_const_ostype_win32 = function() return 0 end
 caml_sys_const_word_size = function() return 128 end               -- encoded 64
+-- OCaml 4.x naked-pointer check; we don't have naked pointers, so
+-- always-on is the right answer.
+caml_sys_const_naked_pointers_checked = function() return 2 end
+
+-- GC primitives.  No actual GC to control — Lua handles memory.
+-- OCaml 4.x's stdlib calls these at exit; we just no-op.
+caml_gc_major = function() return 0 end
+caml_gc_minor = function() return 0 end
+caml_gc_full_major = function() return 0 end
+caml_gc_compaction = function() return 0 end
+caml_gc_quick_stat = function()
+  return {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+end
+caml_gc_stat = caml_gc_quick_stat
+caml_gc_counters = function() return {0, {253, 0}, {253, 0}, {253, 0}} end
+caml_gc_get = function()
+  return {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+end
+caml_gc_set = function(_) return 0 end
+caml_gc_minor_words = function() return {253, 0} end
+caml_gc_huge_fallback_count = function() return 0 end
+caml_gc_allocated_bytes = function() return {253, 0} end
+caml_get_minor_free = function() return 0 end
+caml_final_register = function() return 0 end
+caml_final_register_called_without_value = function() return 0 end
+caml_final_release = function() return 0 end
 caml_sys_convert_signal_number = function(_) return 0 end
 caml_sys_getenv_opt = function(_) return 0 end
 caml_sys_io_buffer_size = function() return 131072 end             -- encoded 65536

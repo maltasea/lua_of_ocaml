@@ -7,8 +7,10 @@
 [home](https://maltasea.yoiky.com/lua_of_ocaml) · [source](https://github.com/maltasea/lua_of_ocaml)
 
 Compiles OCaml bytecode programs to Lua, inspired by js_of_ocaml.
-Tested against OCaml 5.1–5.4 and Lua 5.1, 5.4, and LuaJIT (one runtime
-shim covers them all).
+Tested against OCaml 4.14 and 5.1–5.4 against Lua 5.1, 5.4, and
+LuaJIT (one runtime shim covers all five Lua interpreters).
+Effect handlers (a 5.0+ feature) are the only test gated on OCaml
+version; everything else passes the full suite under all combos.
 
 Covers a useful slice of OCaml: ints, strings, bytes (with mutation),
 floats, lists, options, results, arrays, records, tuples, mutable refs,
