@@ -145,6 +145,19 @@ LÖVE API; that's the canonical reference pattern.
 
 generated lua has `--# file:line` markers. use `ocamlc -g`.
 
+## performance
+
+Tight numeric for-loops match or beat `ocamlrun` (LuaJIT JITs them).
+Other patterns range from ~4× to ~25× slower than `ocamlrun` (which
+is itself bytecode-interpreted, not native). See
+[`misc/bench.md`](misc/bench.md) for per-test numbers.
+
+## effect handlers
+
+`runtime/lua/effects.lua` (~90 lines) implements OCaml 5 effects via
+Lua coroutines.  [`misc/effects-writeup.md`](misc/effects-writeup.md)
+walks through the trick.
+
 ## tests
 
     make test                          # main suite (24 checks)
