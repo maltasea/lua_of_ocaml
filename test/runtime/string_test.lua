@@ -25,10 +25,17 @@ check("def>abc", caml_string_compare("def", "abc") == 2)
 
 print("=== create/blit ===")
 check("create", #caml_create_string(20) == 10)
-check("blit", caml_blit_string("ab", 0, "xxxx", 0, 4) == "abxx")
-
-print("=== fill ===")
-check("fill", caml_fill_string("xxxx", 4, 4, 194) == "xxaa")
+-- blit / fill operate on Bytes (mutable) — wrap "xxxx" first.
+do
+  local b = caml_bytes_of_string("xxxx")
+  caml_blit_string("ab", 0, b, 0, 4)
+  check("blit", caml_string_of_bytes(b) == "abxx")
+end
+do
+  local b = caml_bytes_of_string("xxxx")
+  caml_fill_string(b, 4, 4, 194)
+  check("fill", caml_string_of_bytes(b) == "xxaa")
+end
 
 print(string.format("string: %d/%d", pass, total))
 if pass < total then os.exit(1) end

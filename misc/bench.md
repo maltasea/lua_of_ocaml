@@ -12,9 +12,9 @@ Hardware: M1 mac, no special tuning.
 | `fib(30)`              | 0.04s   | 0.20s   | **5×**   | non-tail recursion |
 | `sum_array(1M)`        | 0.05s   | 0.04s   | **0.7×** | for-loop + array write/read |
 | `fold_list(200K)`      | 0.02s   | 0.08s   | **4×**   | tail-recursive list build + fold |
-| `string_concat(100K)`  | 0.02s   | 12.59s  | **787×** | Buffer.add_string in a loop |
-| `map_ops(50K)`         | 0.10s   | 3.43s   | **33×**  | Map.Make + closures |
-| `closure_calls(1M)`    | 0.04s   | 0.18s   | **5×**   | higher-order function call |
+| `string_concat(100K)`  | 0.02s   | 0.14s   | **9×**   | Buffer.add_string in a loop |
+| `map_ops(50K)`         | 0.10s   | 2.48s   | **25×**  | Map.Make + closures |
+| `closure_calls(1M)`    | 0.04s   | 0.16s   | **4×**   | higher-order function call |
 
 (Plain Lua 5.4 is uniformly another 3-5× slower than LuaJIT — LuaJIT's
 trace JIT makes a huge difference on tight numeric loops.)
@@ -31,11 +31,13 @@ trace JIT makes a huge difference on tight numeric loops.)
   and a `select("#", ...)` per call. For exact applications that's
   pure overhead.
 
-- **`Buffer.add_string` is catastrophically slow.** The Bytes
+- **`Buffer.add_string` was catastrophically slow.** ~~The Bytes
   representation is `{ string }` — a single Lua-string wrapped in a
-  table. Every `Bytes.blit_string` (called by `Buffer.add_string`)
-  rebuilds the entire dst string with `..` and `string.sub`. Over
-  100K iterations of 3-char appends, that's roughly *O(n²)* work.
+  table.  Every `Bytes.blit_string` (called by `Buffer.add_string`)
+  rebuilds the entire dst string with `..` and `string.sub`.~~ FIXED:
+  Bytes is now `{ chars_table }` where chars_table is a Lua array of
+  byte values.  Every set/blit is O(len) instead of O(n).  Old 787×
+  ratio dropped to 9×.
 
 - **`Map.add` is 33× slower.** Map.Make is a heavy functor —
   pointer-chasing through tree nodes, all functions polymorphic
@@ -55,28 +57,22 @@ let rec build acc i = if i = 0 then acc else build (i :: acc) (i - 1)
 let xs = build [] 200_000  (* works *)
 ```
 
-## What's worth optimising
+## What's worth optimising next
 
-In rough order of pain-per-line-of-fix:
+1. **Map/Set/Hashtbl runtime helpers** (the 25× Map regression).
+   Reimplement the hot ones (find, add, mem) in Lua-native code
+   instead of going through OCaml's purely-functional tree per node.
+   Could land a 5-10× speedup.
 
-1. **Bytes/Buffer representation** (fixes the 787× regression).
-   Change `Bytes.t` from `{ string }` to `{ chars_table, length }`
-   where `chars_table` is a Lua table of byte values. Every
-   `caml_bytes_get/set/blit` becomes O(1)/O(len) amortised.
-   Buffer.add_char trivially fast.
-
-2. **Tail-call codegen** (fixes correctness for deep recursion).
-   Detect IR tail positions, emit `return f(args)`.
-
-3. **Specialised `caml_call_gen` for exact-arity calls** (helps fib,
+2. **Specialised `caml_call_gen` for exact-arity calls** (helps fib,
    closure_calls). Most calls are exact; emit them as direct Lua
    calls without the arity-table lookup. We already do this when
    the IR says `exact = true` — the question is whether more sites
    in the IR could be tagged exact than currently are.
 
-4. **Map/Set/Hashtbl runtime helpers**. Reimplement the hot ones
-   (find, add, mem) in Lua native code instead of going through
-   OCaml's purely-functional tree per node.
+3. ~~Tail-call codegen~~ DONE.
+
+4. ~~Bytes/Buffer representation~~ DONE.
 
 ## How to run
 

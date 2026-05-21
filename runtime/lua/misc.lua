@@ -256,41 +256,49 @@ caml_nativeint_format = caml_format_int
 caml_int64_format = function(_fmt, _i) return "0" end
 
 -- Multi-byte string/bytes get/set, used by Bytes.get_int16_*, etc.
-local function _multi_get(s, i, n, signed)
+-- Strings are Lua strings (byte via string.byte); Bytes are
+-- { chars_table } (byte via direct index).
+local function _str_get(s, i, n)
   local r = 0
   for k = 0, n - 1 do
     r = r + string.byte(s, math_floor(i / 2) + 1 + k) * (256 ^ k)
   end
-  if signed then
-    local sign_bit = 256 ^ n / 2
-    if r >= sign_bit then r = r - 256 ^ n end
+  return r * 2
+end
+local function _chars_get(c, i, n)
+  local r = 0
+  local base = math_floor(i / 2)
+  for k = 0, n - 1 do
+    r = r + (c[base + 1 + k] or 0) * (256 ^ k)
   end
   return r * 2
 end
-function caml_string_get16(s, i)     return _multi_get(s, i, 2, false) end
-function caml_string_get32(s, i)     return _multi_get(s, i, 4, false) end
-function caml_string_get64(s, i)     return 0 end   -- Int64 unsupported
+function caml_string_get16(s, i) return _str_get(s, i, 2) end
+function caml_string_get32(s, i) return _str_get(s, i, 4) end
+function caml_string_get64(_s, _i) return 0 end
 function caml_bytes_get16(b, i)
-  local s = type(b) == "table" and b[1] or b
-  return _multi_get(s, i, 2, false)
+  if type(b) == "table" then return _chars_get(b[1], i, 2) end
+  return _str_get(b, i, 2)
 end
 function caml_bytes_get32(b, i)
-  local s = type(b) == "table" and b[1] or b
-  return _multi_get(s, i, 4, false)
+  if type(b) == "table" then return _chars_get(b[1], i, 4) end
+  return _str_get(b, i, 4)
 end
 function caml_bytes_get64(_b, _i) return 0 end
-local function _multi_set(b, i, n, v)
-  local s = type(b) == "table" and b[1] or b
-  local pos = math_floor(i / 2) + 1
+
+local function _chars_set(c, i, n, v)
+  local base = math_floor(i / 2)
   v = math_floor(v / 2)
-  local buf = {}
-  for k = 1, n do buf[k] = string.char(v % 256); v = math_floor(v / 256) end
-  local r = string.sub(s, 1, pos - 1) .. table.concat(buf) .. string.sub(s, pos + n)
-  if type(b) == "table" then b[1] = r end
+  for k = 0, n - 1 do c[base + 1 + k] = v % 256; v = math_floor(v / 256) end
+end
+function caml_bytes_set16(b, i, v)
+  if type(b) == "table" then _chars_set(b[1], i, 2, v) end
   return 0
 end
-function caml_bytes_set16(b, i, v) return _multi_set(b, i, 2, v) end
-function caml_bytes_set32(b, i, v) return _multi_set(b, i, 4, v) end
+function caml_bytes_set32(b, i, v)
+  if type(b) == "table" then _chars_set(b[1], i, 4, v) end
+  return 0
+end
 function caml_bytes_set64(_, _, _) return 0 end
 
 caml_floatarray_get = caml_array_get
