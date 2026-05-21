@@ -80,6 +80,8 @@ compare "gadt"         "gadt.ml"
 
 compare "objects"      "objects.ml"
 compare "effects"      "effects.ml"
+compare "json"         "json.ml"
+compare "hashtbl"      "hashtbl.ml"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed, $XFAIL xfail, $XPASS xpass ==="

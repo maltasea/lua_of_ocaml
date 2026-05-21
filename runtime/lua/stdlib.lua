@@ -54,9 +54,15 @@ function caml_lessequal(a, b)   return _cmp(a, b) <= 0 end
 function caml_greaterthan(a, b) return _cmp(a, b) > 0 end
 function caml_greaterequal(a,b) return _cmp(a, b) >= 0 end
 
-function caml_register_global(id, name, v)
-  caml_global_data[id + 1] = v
-  caml_global_data[name] = v
+-- The IR emits `caml_register_global(slot_id, global_value, "Name")`
+-- (per parse_bytecode.ml: id, then Pv access_global, then name string).
+-- We previously had the second/third args swapped, so slot 1+id ended
+-- up holding "" instead of e.g. the Not_found exception block — which
+-- meant Hashtbl's randomization handshake (try Sys.getenv ... with
+-- Not_found -> …) couldn't identify Not_found by reference.
+function caml_register_global(id, value, name)
+  caml_global_data[id + 1] = value
+  if name and name ~= "" then caml_global_data[name] = value end
 end
 
 function caml_register_named_value(name, v)

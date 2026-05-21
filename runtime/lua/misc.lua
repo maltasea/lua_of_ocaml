@@ -83,7 +83,13 @@ function caml_int64_bits_of_float(_) return 0 end
 
 function caml_sys_executable_name(_) return "" end
 function caml_sys_get_config(_) return "" end
-function caml_sys_getenv(_) return 0 end
+function caml_sys_getenv(_)
+  -- Without a real env, callers like Hashtbl rely on Not_found to fall
+  -- through to defaults.  Raise the registered Not_found block by name.
+  local nf = caml_global_data and caml_global_data["Not_found"]
+  if nf then caml_raise(nf) end
+  return 0
+end
 function caml_sys_system(_) return 0 end
 function caml_sys_exit(code) os.exit(math_floor(code / 2)) end
 function caml_sys_open(_path, _flags, _perm) return 0 end
@@ -183,6 +189,19 @@ caml_ml_enable_runtime_warnings = function(_) return 0 end
 caml_ml_runtime_warnings_enabled = function() return 0 end
 caml_atomic_fetch_add_field = function(_, _, _) return 0 end
 caml_atomic_make_contended = function(_) return 0 end
+
+-- Domain-local storage (single-domain in Lua).  The runtime stores a
+-- single slot table; OCaml's Domain module reads it for hashtbl
+-- randomization, etc.
+caml_domain_dls = { 0 }  -- empty block
+function caml_domain_dls_get(_) return caml_domain_dls end
+function caml_domain_dls_set(v) caml_domain_dls = v; return 0 end
+function caml_domain_dls_compare_and_set(_old, new) caml_domain_dls = new; return 2 end
+function caml_ml_domain_unique_token() return {0} end
+function caml_ml_domain_id(_) return 0 end
+function caml_ml_domain_set_name(_) return 0 end
+function caml_recommended_domain_count() return 2 end -- encoded 1
+function caml_domain_spawn(_, _) return 0 end
 -- caml_compare provided by stdlib.lua (structural)
 -- caml_array_* provided by array.lua
 
@@ -278,6 +297,95 @@ caml_floatarray_get = caml_array_get
 caml_floatarray_set = caml_array_set
 caml_floatarray_unsafe_get = caml_array_unsafe_get
 caml_floatarray_unsafe_set = caml_array_unsafe_set
+function caml_floatarray_create(n)
+  local len = math_floor(n / 2); local v = { 0 }
+  for i = 1, len do v[i + 1] = { 253, 0 } end
+  return v
+end
+caml_floatarray_make = caml_floatarray_create
+function caml_floatarray_blit(src, sofs, dst, dofs, len)
+  return caml_array_blit(src, sofs, dst, dofs, len)
+end
+caml_floatarray_append = caml_array_append
+caml_floatarray_concat = caml_array_concat
+caml_floatarray_fill = caml_array_fill
+caml_floatarray_sub = caml_array_sub
+
+function caml_nextafter_float(a, b)
+  -- Reasonable single-step ULP approximation.
+  local x = type(a) == "table" and a[2] or a
+  local y = type(b) == "table" and b[2] or b
+  if x == y then return {253, x} end
+  local d = (x < y) and 1e-308 or -1e-308
+  return {253, x + d}
+end
+function caml_trunc_float(a)
+  local v = type(a) == "table" and a[2] or a
+  return {253, (v >= 0) and math.floor(v) or math.ceil(v)}
+end
+
+-- Int64 lowered to placeholder.  These are stubs that keep code that
+-- merely references Int64 from crashing under LOO_STRICT — values
+-- computed through them are still 0 (warned at compile time).
+function caml_int64_of_int(n) return 0 end
+function caml_int64_to_int(_) return 0 end
+function caml_int64_add(_, _) return 0 end
+function caml_int64_sub(_, _) return 0 end
+function caml_int64_mul(_, _) return 0 end
+function caml_int64_div(_, _) return 0 end
+function caml_int64_mod(_, _) return 0 end
+function caml_int64_neg(_) return 0 end
+function caml_int64_and(_, _) return 0 end
+function caml_int64_or(_, _) return 0 end
+function caml_int64_xor(_, _) return 0 end
+function caml_int64_shift_left(_, _) return 0 end
+function caml_int64_shift_right(_, _) return 0 end
+function caml_int64_shift_right_unsigned(_, _) return 0 end
+function caml_int64_of_float(_) return 0 end
+function caml_int64_to_float(_) return {253, 0} end
+function caml_int64_of_string(_) return 0 end
+function caml_int64_to_string(_) return "0" end
+function caml_int64_compare(_, _) return 0 end
+function caml_int64_equal(_, _) return 2 end
+function caml_int64_bits_of_float_unboxed(_) return 0 end
+
+-- Nativeint ≈ int in our 1-domain model; aliases keep stdlib happy.
+caml_nativeint_of_int = function(n) return n end
+caml_nativeint_to_int = function(n) return n end
+caml_nativeint_add = function(a, b) return a + b end
+caml_nativeint_sub = function(a, b) return a - b end
+caml_nativeint_mul = caml_mul
+caml_nativeint_div = caml_div
+caml_nativeint_mod = caml_mod
+caml_nativeint_neg = function(a) return -a end
+caml_nativeint_and = caml_and
+caml_nativeint_or = caml_or
+caml_nativeint_xor = caml_xor
+caml_nativeint_shift_left = caml_lsl
+caml_nativeint_shift_right = caml_asr
+caml_nativeint_shift_right_unsigned = caml_lsr
+caml_nativeint_of_string = caml_int_of_string
+caml_nativeint_to_string = caml_string_of_int
+caml_nativeint_of_float = caml_int_of_float
+caml_nativeint_to_float = caml_float_of_int
+caml_int32_of_int = function(n) return n end
+caml_int32_to_int = function(n) return n end
+caml_int32_add = function(a, b) return a + b end
+caml_int32_sub = function(a, b) return a - b end
+caml_int32_mul = caml_mul
+caml_int32_div = caml_div
+caml_int32_mod = caml_mod
+caml_int32_neg = function(a) return -a end
+caml_int32_and = caml_and
+caml_int32_or = caml_or
+caml_int32_xor = caml_xor
+caml_int32_shift_left = caml_lsl
+caml_int32_shift_right = caml_asr
+caml_int32_shift_right_unsigned = caml_lsr
+caml_int32_of_string = caml_int_of_string
+caml_int32_to_string = caml_string_of_int
+caml_int32_of_float = caml_int_of_float
+caml_int32_to_float = caml_float_of_int
 caml_ephe_create = function(_, _) return {0} end
 caml_ephe_blit_data = function(_, _, _, _, _, _) return 0 end
 caml_ephe_blit_key = function(_, _, _, _, _, _) return 0 end

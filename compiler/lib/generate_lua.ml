@@ -114,7 +114,11 @@ let rec translate_expr blocks = function
 and translate_constant = function
   | Code.String s -> L.string_ s
   | Code.NativeString (Code.Native_string.Byte s) -> L.string_ s
-  | Code.NativeString _ -> L.string_ ""
+  | Code.NativeString (Code.Native_string.Utf u) ->
+      (* Utf8_string.t is `Utf8 of string [@@ocaml.unboxed]`; the
+         runtime representation IS the string, so Obj.magic is safe.
+         The module's sig doesn't expose a to_string, hence this. *)
+      L.string_ (Obj.magic u : string)
   | Code.Int i ->
       let n = Targetint.(shift_left i 1 |> to_int_exn) in
       L.int_ n
