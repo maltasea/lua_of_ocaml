@@ -10,6 +10,10 @@
 local math_floor = math.floor
 local string_byte = string.byte
 local string_char = string.char
+-- Lua 5.2+ moved `unpack` to `table.unpack`.  Pick whichever is in
+-- scope so this file works on Lua 5.1–5.4 and LuaJIT, even when
+-- loaded standalone (the test runner dofiles it directly).
+local unpack = unpack or table.unpack
 
 -- ---- Plain strings ----
 

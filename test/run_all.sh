@@ -84,8 +84,8 @@ say "source comment count"
 count=$(grep -c "hello.ml:" $TMP/smoke_hello.lua 2>/dev/null || echo 0)
 [ "$count" -ge 1 ] && ok || fail "got $count"
 
-say "single _main()"
-count=$(grep -c "^_main()" $TMP/smoke_hello.lua 2>/dev/null || echo 0)
+say "single xpcall(_main, …)"
+count=$(grep -c "^local _ok, _err = xpcall(_main" $TMP/smoke_hello.lua 2>/dev/null || echo 0)
 [ "$count" -eq 1 ] && ok || fail "got $count"
 
 echo ""

@@ -161,8 +161,23 @@ and translate_prim p args =
   | Code.Ult, [a; b] -> L.bin L.Lt (pa a) (pa b)
   | Code.Extern name, args ->
       L.call (L.EVar (L.ident (clean_extern name))) (List.map ~f:pa args)
-  | _ ->
-      L.call (L.EVar (L.ident "caml_prim_missing")) (List.map ~f:pa args)
+  | p, args ->
+      (* Name the unhandled IR primitive so the runtime error is
+         actionable instead of "attempt to call nil value". *)
+      let label = match p with
+        | Code.Vectlength -> "Vectlength"
+        | Code.Array_get -> "Array_get"
+        | Code.Extern n -> "Extern " ^ n
+        | Code.Not -> "Not"
+        | Code.IsInt -> "IsInt"
+        | Code.Eq -> "Eq"
+        | Code.Neq -> "Neq"
+        | Code.Lt -> "Lt"
+        | Code.Le -> "Le"
+        | Code.Ult -> "Ult"
+      in
+      L.call (L.EVar (L.ident "caml_prim_missing"))
+        (L.string_ label :: List.map ~f:pa args)
 
 (* ---- Translate instructions ---- *)
 

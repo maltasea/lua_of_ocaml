@@ -5,6 +5,11 @@
 
 local math_floor = math.floor
 
+-- Compatibility shim: `unpack` moved to `table.unpack` in Lua 5.2.
+-- LuaJIT keeps the 5.1 global; standard Lua 5.2+ only has table.unpack.
+-- This makes the runtime work under any Lua from 5.1 to 5.4.
+unpack = unpack or table.unpack
+
 caml_global_data = {}
 
 -- Structural equality / comparison.

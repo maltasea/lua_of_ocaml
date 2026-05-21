@@ -19,7 +19,7 @@ let () =
 let runtime_files =
   [ "stdlib.lua"; "ints.lua"; "obj.lua"; "fail.lua"
   ; "string.lua"; "array.lua"; "io.lua"; "misc.lua"
-  ; "effects.lua"
+  ; "effects.lua"; "traceback.lua"
   ]
 
 let dir_has_runtime dir =
@@ -69,7 +69,11 @@ let write_output ~runtime_dir ~source_file oc lua_prog =
     (Printf.sprintf "--# source: %s\n" source_file);
   Js_of_ocaml_compiler.Pretty_print.string fmt (load_runtime runtime_dir);
   Output_lua.program fmt lua_prog;
-  Js_of_ocaml_compiler.Pretty_print.string fmt "_main()\n"
+  (* Wrap _main in xpcall + source-mapped traceback so errors point
+     back at the OCaml file:line rather than the huge generated .lua. *)
+  Js_of_ocaml_compiler.Pretty_print.string fmt
+    "local _ok, _err = xpcall(_main, caml_top_traceback)\n\
+     if not _ok then io.stderr:write(tostring(_err) .. \"\\n\"); os.exit(1) end\n"
 
 let run ~runtime_dir ~strict_unsupported input_file output_file =
   let ic = open_in_bin input_file in
