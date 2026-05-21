@@ -140,8 +140,13 @@ let () =
         print_endline "  --strict-unsupported  Fail (don't warn) on Int64/Float_array";
         print_endline "  Env LOO_RUNTIME overrides the search path.";
         exit 0
-    | f :: rest when String.length f > 0 && Char.equal f.[0] '-' ->
-        parse_args rest  (* unknown flag, skip *)
+    | "--" :: rest -> parse_args rest  (* end-of-options separator *)
+    | f :: _rest when String.length f > 0 && Char.equal f.[0] '-' ->
+        (* Bail loudly on unknown flags so typos like
+           --strict-unsuported don't silently compile. *)
+        Printf.eprintf "ERROR: unknown option %s\n" f;
+        Printf.eprintf "Run lua_of_ocaml --help for usage.\n";
+        exit 2
     | f :: rest ->
         input_file := Some f; parse_args rest
   in

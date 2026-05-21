@@ -17,6 +17,14 @@ caml_global_data = {}
 -- tables {tag, f1, f2, ...}; lists are {0, hd, tl} terminated by 0;
 -- floats are boxed as {253, v}.  Cycles are not handled.
 local function _eq(a, b)
+  -- Float fast path: NaN must compare unequal to itself, even when
+  -- the boxes are physically identical (OCaml polymorphic equality
+  -- says `nan = nan` is false).  Check before the `a == b` shortcut.
+  if type(a) == "table" and a[1] == 253 and type(b) == "table" and b[1] == 253 then
+    local va, vb = a[2], b[2]
+    if va ~= va or vb ~= vb then return false end  -- one is NaN
+    return va == vb
+  end
   if a == b then return true end
   local ta, tb = type(a), type(b)
   if ta ~= tb then return false end

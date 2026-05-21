@@ -129,17 +129,51 @@ and translate_constant = function
       let n = Int32.(to_int (shift_left i 1)) in
       L.int_ n
   | Code.Float f ->
+      (* `f` is the Int64 bit pattern; check it directly so we don't
+         depend on the monomorphic int (<>) jsoo's Stdlib installs. *)
       let bits = Int64.float_of_bits f in
-      L.table [L.TArray (L.int_ 253); L.TArray (L.ENum (Printf.sprintf "%.17g" bits))]
+      (* NaN: exponent bits all 1 AND mantissa non-zero. *)
+      let exp_mask = 0x7FF0_0000_0000_0000L in
+      let mantissa_mask = 0x000F_FFFF_FFFF_FFFFL in
+      let is_nan =
+        Int64.equal (Int64.logand f exp_mask) exp_mask
+        && not (Int64.equal (Int64.logand f mantissa_mask) 0L)
+      in
+      let lit =
+        if Int64.equal f 0x7FF0_0000_0000_0000L
+          then L.EVar (L.ident "math.huge")
+        else if Int64.equal f 0xFFF0_0000_0000_0000L
+          then L.EUn (L.Neg, L.EVar (L.ident "math.huge"))
+        else if is_nan
+          then L.bin L.Div (L.ENum "0") (L.ENum "0")
+        else L.ENum (Printf.sprintf "%.17g" bits)
+      in
+      L.table [L.TArray (L.int_ 253); L.TArray lit]
   | Code.Tuple (tag, fields, _) ->
       let fields = Array.to_list (Array.map fields ~f:translate_constant) in
       make_block (L.int_ tag) fields
   | Code.Float_array _ ->
       incr unsupported_float_array_count;
       make_block (L.int_ 253) [L.int_ 0]
-  | Code.Int64 _ ->
-      incr unsupported_int64_count;
-      L.int_ 0
+  | Code.Int64 bits ->
+      (* Emit as { 255, hi32, lo32 } so the runtime can at least
+         recognize the float-bit-pattern constants the stdlib uses
+         to define infinity / nan / max_float / etc. *)
+      let hi = Int64.(to_int (logand (shift_right_logical bits 32) 0xFFFFFFFFL)) in
+      let lo = Int64.(to_int (logand bits 0xFFFFFFFFL)) in
+      (* Don't count stdlib's float-bit-pattern constants as
+         "unsupported uses" — the runtime handles them correctly.
+         Without this, every hello world reports "6 Int64 constants"
+         and --strict-unsupported is unusable. *)
+      let is_stdlib_float_constant =
+        let exp = hi land 0x7FF00000 in
+        exp = 0x7FF00000  (* ±inf, NaN *)
+        || (hi = 0x7FEFFFFF && lo = 0xFFFFFFFF)  (* max_float *)
+        || (hi = 0x00100000 && lo = 0)            (* min_float *)
+        || (hi = 0x3CB00000 && lo = 0)            (* epsilon_float *)
+      in
+      if not is_stdlib_float_constant then incr unsupported_int64_count;
+      make_block (L.int_ 255) [L.int_ hi; L.int_ lo]
 
 and translate_prim p args =
   let pa a = match a with Code.Pv v -> evar v | Code.Pc c -> translate_constant c in

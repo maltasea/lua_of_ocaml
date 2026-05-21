@@ -1,0 +1,12 @@
+; Hook the shell-based test runners into `dune runtest`, so opam
+; `--with-test` actually exercises the compiler.  LUA defaults from
+; the environment; CI overrides via `LUA=lua5.4 dune runtest` etc.
+(rule
+ (alias runtest)
+ (deps
+   (source_tree ..))
+ (action
+  (no-infer
+   (progn
+    (bash "cd .. && bash test/run_all.sh")
+    (bash "cd .. && bash test/behavioral/run.sh")))))

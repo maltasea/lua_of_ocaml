@@ -19,6 +19,9 @@ function caml_ml_output(chan, s, ofs, len)
   if s == nil then return 0 end
   local o = math_floor(ofs / 2) + 1
   local l = math_floor(len / 2)
+  -- s might be a Bytes value: { chars_table }.  Materialise to a Lua
+  -- string for io.write — direct string.sub on a table crashes.
+  if type(s) == "table" then s = caml_string_of_bytes(s) end
   io.write(string.sub(s, o, o + l - 1))
   return 0
 end

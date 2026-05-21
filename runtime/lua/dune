@@ -1,0 +1,17 @@
+; Install the Lua runtime into PREFIX/share/lua_of_ocaml/runtime/lua so
+; the installed binary finds it via its <bindir>/../share/lua_of_ocaml
+; /runtime/lua search path (see compiler/bin-lua_of_ocaml/main.ml).
+(install
+ (section share)
+ (package lua_of_ocaml)
+ (files
+   (array.lua as runtime/lua/array.lua)
+   (effects.lua as runtime/lua/effects.lua)
+   (fail.lua as runtime/lua/fail.lua)
+   (ints.lua as runtime/lua/ints.lua)
+   (io.lua as runtime/lua/io.lua)
+   (misc.lua as runtime/lua/misc.lua)
+   (obj.lua as runtime/lua/obj.lua)
+   (stdlib.lua as runtime/lua/stdlib.lua)
+   (string.lua as runtime/lua/string.lua)
+   (traceback.lua as runtime/lua/traceback.lua)))

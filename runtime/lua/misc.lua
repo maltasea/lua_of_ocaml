@@ -78,8 +78,34 @@ function caml_string_of_int(i)
   return tostring(math_floor(i / 2))
 end
 
-function caml_int64_float_of_bits(_) return 0 end
-function caml_int64_bits_of_float(_) return 0 end
+-- Int64 → float (bit-pattern reinterpret).  Code.Int64 lowers to
+-- { 255, hi, lo } so we can at least recognize the IEEE-754 bit
+-- patterns the stdlib uses to define infinity / nan / max_float etc.
+-- Any payload with the all-ones exponent is a NaN.
+function caml_int64_float_of_bits(b)
+  if type(b) ~= "table" or b[1] ~= 255 then return { 253, 0 } end
+  local hi, lo = b[2] or 0, b[3] or 0
+  -- ±Inf: exponent all 1s, mantissa 0
+  if hi == 0x7FF00000 and lo == 0 then return { 253, math.huge } end
+  if hi == 0xFFF00000 and lo == 0 then return { 253, -math.huge } end
+  -- NaN: exponent all 1s, mantissa non-zero
+  local exp = hi % 0x80000000   -- strip sign bit
+  if exp >= 0x7FF00000 and ((hi % 0x00100000) ~= 0 or lo ~= 0) then
+    return { 253, 0/0 }
+  end
+  -- Stdlib named constants:
+  if hi == 0x7FEFFFFF and lo == 0xFFFFFFFF then return { 253, 1.7976931348623157e308 } end -- max_float
+  if hi == 0x00100000 and lo == 0           then return { 253, 2.2250738585072014e-308 } end -- min_float
+  if hi == 0x3CB00000 and lo == 0           then return { 253, 2.220446049250313e-16 } end  -- epsilon_float
+  -- General case: use string.pack if available (Lua 5.3+) to
+  -- reinterpret bits properly; fall back to 0 otherwise.
+  if string.pack then
+    local s = string.pack(">I4I4", hi, lo)
+    return { 253, string.unpack(">d", s) }
+  end
+  return { 253, 0 }
+end
+function caml_int64_bits_of_float(_) return { 255, 0, 0 } end
 
 function caml_sys_executable_name(_) return "" end
 function caml_sys_get_config(_) return "" end
@@ -375,27 +401,32 @@ end
 -- Int64 lowered to placeholder.  These are stubs that keep code that
 -- merely references Int64 from crashing under LOO_STRICT — values
 -- computed through them are still 0 (warned at compile time).
-function caml_int64_of_int(n) return 0 end
+-- Int64 ops are stubs; the actual representation is { 255, hi, lo }
+-- (see Code.Int64 in generate_lua.ml).  We return {255, 0, 0} so
+-- downstream code sees a consistently-shaped value.  Real Int64
+-- arithmetic is "warn at compile time, compute 0 at runtime".
+local function _zero_i64() return { 255, 0, 0 } end
+function caml_int64_of_int(_) return _zero_i64() end
 function caml_int64_to_int(_) return 0 end
-function caml_int64_add(_, _) return 0 end
-function caml_int64_sub(_, _) return 0 end
-function caml_int64_mul(_, _) return 0 end
-function caml_int64_div(_, _) return 0 end
-function caml_int64_mod(_, _) return 0 end
-function caml_int64_neg(_) return 0 end
-function caml_int64_and(_, _) return 0 end
-function caml_int64_or(_, _) return 0 end
-function caml_int64_xor(_, _) return 0 end
-function caml_int64_shift_left(_, _) return 0 end
-function caml_int64_shift_right(_, _) return 0 end
-function caml_int64_shift_right_unsigned(_, _) return 0 end
-function caml_int64_of_float(_) return 0 end
+function caml_int64_add(_, _) return _zero_i64() end
+function caml_int64_sub(_, _) return _zero_i64() end
+function caml_int64_mul(_, _) return _zero_i64() end
+function caml_int64_div(_, _) return _zero_i64() end
+function caml_int64_mod(_, _) return _zero_i64() end
+function caml_int64_neg(_) return _zero_i64() end
+function caml_int64_and(_, _) return _zero_i64() end
+function caml_int64_or(_, _) return _zero_i64() end
+function caml_int64_xor(_, _) return _zero_i64() end
+function caml_int64_shift_left(_, _) return _zero_i64() end
+function caml_int64_shift_right(_, _) return _zero_i64() end
+function caml_int64_shift_right_unsigned(_, _) return _zero_i64() end
+function caml_int64_of_float(_) return _zero_i64() end
 function caml_int64_to_float(_) return {253, 0} end
-function caml_int64_of_string(_) return 0 end
+function caml_int64_of_string(_) return _zero_i64() end
 function caml_int64_to_string(_) return "0" end
 function caml_int64_compare(_, _) return 0 end
 function caml_int64_equal(_, _) return 2 end
-function caml_int64_bits_of_float_unboxed(_) return 0 end
+function caml_int64_bits_of_float_unboxed(_) return _zero_i64() end
 
 -- Nativeint ≈ int in our 1-domain model; aliases keep stdlib happy.
 caml_nativeint_of_int = function(n) return n end

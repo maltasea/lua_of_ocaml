@@ -9,12 +9,26 @@
 local math_floor = math.floor
 
 function caml_mul(a, b) return math_floor(a * b / 2) end
-function caml_div(a, b) return math_floor(math_floor(a / 2) / math_floor(b / 2)) * 2 end
+
+-- OCaml integer division truncates toward zero (C semantics):
+--   -3 / 2 = -1   (not -2)
+--    3 / -2 = -1  (not -2)
+-- Lua's math.floor rounds toward -inf, so we have to special-case
+-- signs.  Modulo is `a - (a / b) * b` to keep the relationship.
+local function trunc_div(a, b)
+  if (a < 0) == (b < 0) then return math_floor(a / b) end
+  -- Different signs: ceil division.
+  return -math_floor(-a / b)
+end
+function caml_div(a, b)
+  local a2 = math_floor(a / 2)
+  local b2 = math_floor(b / 2)
+  return trunc_div(a2, b2) * 2
+end
 function caml_mod(a, b)
   local a2 = math_floor(a / 2)
   local b2 = math_floor(b / 2)
-  local m = a2 % b2
-  if m < 0 then m = m + b2 end return m * 2
+  return (a2 - trunc_div(a2, b2) * b2) * 2
 end
 
 -- Pure-Lua bitwise for Lua 5.1
