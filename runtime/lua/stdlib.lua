@@ -108,17 +108,15 @@ end
 function caml_call_gen(f, ...)
   local arity = caml_arity[f]
   local nargs = select("#", ...)
+  if arity == nargs then return f(...) end
   if arity == nil then
-    -- Unknown arity (likely a Lua-side FFI function or a Lua function
-    -- without arity info): apply one arg at a time.
+    -- Lua-side FFI function: apply one arg at a time.
     local args = { ... }
     local r = f
     for i = 1, nargs do r = r(args[i]) end
     return r
   end
-  if arity == nargs then
-    return f(...)
-  elseif arity < nargs then
+  if arity < nargs then
     -- Over-application: call f with its declared arity, then apply rest.
     local args = { ... }
     local r = f(unpack(args, 1, arity))
