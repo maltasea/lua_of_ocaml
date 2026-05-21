@@ -16,6 +16,7 @@ loo.sh
 _install
 _gen.lua
 examples/love2d/main.lua
+example-game/main.lua
 *.o
 *.a
 raylib_*

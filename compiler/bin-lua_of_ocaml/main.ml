@@ -27,7 +27,9 @@ let dir_has_runtime dir =
   && List.for_all runtime_files ~f:(fun f ->
          Sys.file_exists (Filename.concat dir f))
 
-let runtime_dir_default =
+(* Resolve the default runtime directory.  Lazy — must NOT run before
+   arg parsing, or a CLI `--runtime` flag would never get its chance. *)
+let runtime_dir_default () =
   let cwd_default = "runtime/lua" in
   let installed_default =
     let bin = Sys.argv.(0) in
@@ -144,7 +146,7 @@ let () =
     | Some d when dir_has_runtime d -> d
     | Some d ->
         Printf.eprintf "ERROR: --runtime %s is missing runtime files\n" d; exit 1
-    | None -> runtime_dir_default
+    | None -> runtime_dir_default ()
   in
   match !input_file with
   | None ->
