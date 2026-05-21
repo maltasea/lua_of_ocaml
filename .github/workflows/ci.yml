@@ -1,0 +1,50 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-and-test:
+    name: ocaml ${{ matrix.ocaml }} + lua ${{ matrix.lua }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ocaml:
+          # Effect handlers test needs OCaml 5.0+; if 4.x support
+          # matters, gate test/behavioral/effects.ml on the version.
+          - "5.1.x"
+          - "5.2.x"
+          - "5.3.x"
+          - "5.4.x"
+        lua:
+          - "luajit"
+          - "lua5.1"
+          - "lua5.4"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install Lua/LuaJIT
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y luajit lua5.1 lua5.4
+
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: ${{ matrix.ocaml }}
+
+      - name: install opam deps
+        run: opam install . --deps-only --with-test --yes
+
+      - name: build
+        run: opam exec -- dune build
+
+      - name: main test suite
+        run: opam exec -- env LUA=${{ matrix.lua }} bash test/run_all.sh
+
+      - name: behavioral suite
+        run: opam exec -- env LUA=${{ matrix.lua }} bash test/behavioral/run.sh

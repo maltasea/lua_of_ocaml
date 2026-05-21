@@ -6,7 +6,9 @@
 
 [home](https://maltasea.yoiky.com/lua_of_ocaml) · [source](https://github.com/maltasea/lua_of_ocaml)
 
-Compiles OCaml bytecode programs to Lua 5.1, inspired by js_of_ocaml.
+Compiles OCaml bytecode programs to Lua, inspired by js_of_ocaml.
+Tested against OCaml 5.1–5.4 and Lua 5.1, 5.4, and LuaJIT (one runtime
+shim covers them all).
 
 Covers a useful slice of OCaml: ints, strings, bytes (with mutation),
 floats, lists, options, results, arrays, records, tuples, mutable refs,
