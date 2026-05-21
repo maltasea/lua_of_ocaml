@@ -59,20 +59,24 @@ let xs = build [] 200_000  (* works *)
 
 ## What's worth optimising next
 
-1. **Map/Set/Hashtbl runtime helpers** (the 25× Map regression).
-   Reimplement the hot ones (find, add, mem) in Lua-native code
-   instead of going through OCaml's purely-functional tree per node.
-   Could land a 5-10× speedup.
+The remaining 4-25× ceiling comes from two sources, both of which
+need compiler-side work rather than runtime tweaks:
 
-2. **Specialised `caml_call_gen` for exact-arity calls** (helps fib,
-   closure_calls). Most calls are exact; emit them as direct Lua
-   calls without the arity-table lookup. We already do this when
-   the IR says `exact = true` — the question is whether more sites
-   in the IR could be tagged exact than currently are.
+1. **Polymorphic-call overhead via `caml_call_gen`**.  Map/Set
+   internal traversal looks up the Ord-compare function from a
+   record field per node, then calls it via `caml_call_gen`.
+   `caml_call_gen` itself JITs fine in LuaJIT (measured at ~1.2 ns
+   per call in a microbench), but the indirection blocks LuaJIT
+   from inlining the compare body.  Fixing this needs IR-level
+   arity propagation so more calls can be tagged `exact=true`.
 
-3. ~~Tail-call codegen~~ DONE.
+2. **Per-node block allocation in functional data structures**.
+   Every Map.add creates a fresh {0, l, k, v, r, h} table.  Lua
+   table creation is intrinsically slower than OCaml runtime block
+   allocation.  Would need either a different representation or
+   in-runtime replacements for the hot Map/Set operations.
 
-4. ~~Bytes/Buffer representation~~ DONE.
+~~Tail-call codegen~~ and ~~Bytes/Buffer representation~~ are done.
 
 ## How to run
 
