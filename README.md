@@ -8,8 +8,21 @@
 
 Compiles OCaml bytecode programs to Lua 5.1, inspired by js_of_ocaml.
 
-> **Note:** this project was written in a heavily guided, multi-hour
-> chat session with Claude Code. Most of it with Model: Deepseek v4.0, and some Opus 4.7 — nothing agentic.
+Covers a useful slice of OCaml: ints, strings, bytes (with mutation),
+floats, lists, options, results, arrays, records, tuples, mutable refs,
+variants (const and block), polymorphic variants, GADTs, modules,
+functors, first-class modules, classes with inheritance, exceptions
+(carrying values, nested try/with), and OCaml 5 effect handlers
+(perform / continue / discontinue, via Lua coroutines). FFI to
+hand-written lua via `external`.
+
+Doesn't cover: `Int64`, `Float_array` (both warn at compile and lower
+to 0 / empty block), marshaling, system/signals/threads, big chunks of
+`Sys.*`. Anywhere a stub returns 0 is documented by `make prim-inventory`.
+
+> **Note:** built in long Claude Code chat sessions across several
+> models — started Deepseek-heavy, the bug-fixing rounds were mostly
+> Opus 4.7. Not agentic.
 
 ## first steps
 
@@ -62,8 +75,9 @@ The IR from js_of_ocaml is target-agnostic. lua_of_ocaml reuses the bytecode par
 | `compiler/lib/output_lua.ml` | lua pretty printer |
 | `compiler/lib/generate_lua.ml` | ir → lua |
 | `compiler/bin-lua_of_ocaml/` | cli tool |
-| `runtime/lua/*.lua` | lua runtime |
+| `runtime/lua/*.lua` | lua runtime (incl. `effects.lua` — effect handlers via lua coroutines) |
 | `test/` | tests |
+| `example-game/` | löve2d chicken jump (canonical FFI example) |
 
 ## ffi: ocaml talking to lua
 
@@ -133,15 +147,17 @@ generated lua has `--# file:line` markers. use `ocamlc -g`.
 
 ## tests
 
-    make test                          # 26 tests
-    bash test/behavioral/run.sh        # 5 behavioral tests
+    make test                          # main suite (24 checks)
+    bash test/behavioral/run.sh        # behavioral diff vs ocamlrun (21)
+    LOO_STRICT=1 make test             # fail loudly on missing primitives
+    make prim-inventory                # audit prims used vs implemented
 
 ## license
 
 lgpl-2.1-or-later with ocaml-lgpl-linking-exception (same as jsoo)
 
 <div class="footer">
-  <small>made in a long chat with claude code — nothing agentic, just vibes</small>
+  <small>built in long chat sessions with claude code — not agentic, just iterating</small>
   <br><br>
   <small>lua_of_ocaml — ocaml → lua 5.1</small>
 </div>
