@@ -19,6 +19,7 @@ let () =
 let runtime_files =
   [ "stdlib.lua"; "ints.lua"; "obj.lua"; "fail.lua"
   ; "string.lua"; "array.lua"; "io.lua"; "misc.lua"
+  ; "effects.lua"
   ]
 
 let dir_has_runtime dir =

@@ -1,8 +1,6 @@
-(* XFAIL: OCaml 5 effect handlers.  These need the runtime primitives
-   caml_alloc_stack, resume, perform, reperform,
-   caml_continuation_use_noexc, etc.  jsoo implements these via a CPS
-   transformation; we don't.  Real support would require a deeper
-   codegen rewrite. *)
+(* OCaml 5 effect handlers, implemented via Lua coroutines (which give
+   us one-shot continuations directly — exactly what OCaml effects use).
+   See runtime/lua/effects.lua. *)
 open Effect
 open Effect.Deep
 type _ Effect.t += Get : int t

@@ -79,10 +79,7 @@ compare "firstclass"   "firstclass.ml"
 compare "gadt"         "gadt.ml"
 
 compare "objects"      "objects.ml"
-
-echo ""
-echo "=== Known-Broken Regressions ==="
-xfail_compare "effects" "effects.ml"
+compare "effects"      "effects.ml"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed, $XFAIL xfail, $XPASS xpass ==="
